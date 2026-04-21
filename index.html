@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Wars</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Game board ─────────────────────────────────────── -->
+  <div id="game-area">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- ── Sidebar ────────────────────────────────────────── -->
+  <aside id="sidebar">
+
+    <!-- Header -->
+    <div id="header">
+      <div id="header-title">CAR WARS</div>
+      <div id="header-sub">
+        <span id="turn-num-label">Turn</span>
+        <span id="turn-num">1</span>
+        &nbsp;·&nbsp;
+        <span id="active-name">Killer Kart</span>
+        &nbsp;/&nbsp;
+        <span id="phase-label">SPEED</span>
+      </div>
+      <div id="header-btns">
+        <button id="zoom-out-btn" title="Zoom out (X)">&#x2212;</button>
+        <span id="zoom-level">100%</span>
+        <button id="zoom-in-btn"  title="Zoom in (Z)">&#x2B;</button>
+        <button id="fullscreen-btn" title="Toggle fullscreen (F)">&#x26F6;</button>
+      </div>
+    </div>
+
+    <!-- Car 1 panel -->
+    <div class="car-panel" id="panel-1">
+      <div class="car-header p1">Killer Kart <span class="player-tag">P1</span></div>
+      <div class="armor-grid">
+        <div class="armor-cell a-top">
+          <span class="af-label">Front</span>
+          <span class="armor-val" id="c1-front">4</span>
+        </div>
+        <div class="armor-cell a-mid">
+          <span class="af-label">L</span>
+          <span class="armor-val" id="c1-left">3</span>
+          <span class="car-icon">&#9632;</span>
+          <span class="armor-val" id="c1-right">3</span>
+          <span class="af-label">R</span>
+        </div>
+        <div class="armor-cell a-bot">
+          <span class="af-label">Back</span>
+          <span class="armor-val" id="c1-back">3</span>
+        </div>
+      </div>
+      <div class="stat-line">
+        Driver: <span id="c1-driver" style="color:#2ecc71">OK</span>
+        &nbsp;·&nbsp; HC: <span id="c1-hc">3</span>
+        &nbsp;·&nbsp; HS: <span id="c1-hs" style="color:#2ecc71">3</span>
+      </div>
+      <div class="stat-line">
+        Speed: <span id="c1-speed-cur">0</span> / <span id="c1-speed-max">15</span>
+        &nbsp;·&nbsp; MG: <span id="c1-w0-ammo">20</span> rds
+      </div>
+    </div>
+
+    <!-- Car 2 panel -->
+    <div class="car-panel" id="panel-2">
+      <div class="car-header p2">Killer Kart <span class="player-tag">P2</span></div>
+      <div class="armor-grid">
+        <div class="armor-cell a-top">
+          <span class="af-label">Front</span>
+          <span class="armor-val" id="c2-front">4</span>
+        </div>
+        <div class="armor-cell a-mid">
+          <span class="af-label">L</span>
+          <span class="armor-val" id="c2-left">3</span>
+          <span class="car-icon">&#9632;</span>
+          <span class="armor-val" id="c2-right">3</span>
+          <span class="af-label">R</span>
+        </div>
+        <div class="armor-cell a-bot">
+          <span class="af-label">Back</span>
+          <span class="armor-val" id="c2-back">3</span>
+        </div>
+      </div>
+      <div class="stat-line">
+        Driver: <span id="c2-driver" style="color:#2ecc71">OK</span>
+        &nbsp;·&nbsp; HC: <span id="c2-hc">3</span>
+        &nbsp;·&nbsp; HS: <span id="c2-hs" style="color:#2ecc71">3</span>
+      </div>
+      <div class="stat-line">
+        Speed: <span id="c2-speed-cur">0</span> / <span id="c2-speed-max">15</span>
+        &nbsp;·&nbsp; MG: <span id="c2-w0-ammo">20</span> rds
+      </div>
+    </div>
+
+    <!-- Phase controls -->
+    <div id="controls">
+
+      <!-- SPEED phase -->
+      <div id="speed-controls">
+        <div class="ctrl-label">Set speed (0–<span id="speed-max-hint">15</span>)</div>
+        <div class="hint">Safe range: <span id="speed-range-hint">0–3</span></div>
+        <div class="speed-row">
+          <button id="speed-down" class="speed-btn">&#8722;</button>
+          <span id="speed-select-val">0</span>
+          <button id="speed-up"   class="speed-btn">&#43;</button>
+        </div>
+        <button id="set-speed" class="btn-primary">GO &#x2192;</button>
+        <div class="hint">or press + / − then Enter</div>
+      </div>
+
+      <!-- MOVE phase -->
+      <div id="move-controls" style="display:none">
+        <div class="ctrl-label">Click a blue square to move</div>
+        <div class="moves-disp">Moves left: <strong id="moves-left">0</strong></div>
+        <button id="end-move" class="btn-primary">End Move</button>
+        <div class="hint">Arrow keys / WASD also work</div>
+      </div>
+
+      <!-- FIRE phase -->
+      <div id="fire-controls" style="display:none">
+        <div class="ctrl-label">Click highlighted enemy to fire</div>
+        <div id="weapon-info" class="weapon-info"></div>
+        <button id="end-turn" class="btn-primary">End Turn &#x2192;</button>
+        <div class="hint">Enter or Space to end turn</div>
+      </div>
+
+    </div>
+
+    <!-- Action log -->
+    <div id="log-wrap">
+      <div id="log-title">Action Log</div>
+      <div id="action-log"></div>
+    </div>
+
+    <!-- Bottom -->
+    <div id="bottom-bar">
+      <button id="restart-btn" class="btn-secondary">New Game</button>
+    </div>
+
+  </aside>
+</div>
+
+<!-- Game-over overlay -->
+<div id="game-over">
+  <div id="game-over-box">
+    <div id="game-over-msg">WINNER!</div>
+    <button onclick="location.reload()">Play Again</button>
+  </div>
+</div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
