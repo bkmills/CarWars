@@ -15,7 +15,7 @@ CarWars/
   index.html          — layout: canvas left, sidebar right
   css/style.css       — dark retro styling
   js/
-    game.js           — all game logic (~830 lines, single script)
+    game.js           — all game logic (~1200 lines, single script)
     Car.js            — (scratch) Car class draft
     Combat.js         — (scratch) combat draft
     GameState.js      — (scratch) state draft
@@ -55,49 +55,64 @@ CarWars/
 - **HS display** — shown per car panel, colour-coded green / yellow / red
 - **Map zoom** — Z/X keys, mouse wheel, sidebar −/+/% buttons; 50–300%, game area scrollable
 
----
+### ✅ v0.3 — Simultaneous Movement & 1×2 Footprint (Compendium pp. 6–7)
+- **Phase-based movement** — 5 phases per turn; `PHASE_CHART` table (speed 0–15) distributes squares across phases matching the Compendium Movement Chart at ×10 mph scale
+- **Simultaneous movement** — both cars declare speed upfront; faster car moves first each phase; coin-flip tie-break (logged)
+- **1×2 car footprint** — each car occupies a front square + rear square derived from facing; `rearSquare(car)` helper; collision detection checks both squares
+- **Elongated counter rendering** — `_drawCar()` draws a 1×2 body with direction arrow on front half
 
-## Roadmap
+### ✅ v0.4 — Full Maneuver Types & Component Damage
 
-### 🔲 v0.3 — Phase-Based Simultaneous Movement
-*Compendium pp. 6–7 — Movement Chart, 5 phases per turn*
-
-Both cars move simultaneously in each of 5 phases per turn, rather than fully alternating.  
-Speed determines which phases a car moves in (the Movement Chart table).
-
-Key changes:
-- New `PHASE_CHART` lookup: speed → array of 5 booleans (move this phase?)
-- Turn loop: for each of phases 1–5, all cars that move in that phase advance 1 square (faster car first)
-- Speed declaration still happens upfront (both players declare before any movement)
-- Fire still happens at end of all 5 movement phases
-- **Biggest architectural change** — `GameState` turn loop needs full redesign
-
-### 🔲 v0.3 — 1×2 Car Footprint
-*Compendium counters: 1" × ½" = 4 sq × 2 sq at our scale*
-
-- Each car occupies a **front square** and a **rear square**
-- `car.x / car.y` = front square; rear square derived from facing
-- Collision detection checks both squares for both cars
-- `_drawCar()` renders an elongated 1×2 counter with arrow on front
-- `getHitFacing()` checks which square was struck to assign front/rear hits correctly
-
-### 🔲 v0.4 — Full Maneuver Types
-*Compendium pp. 9–11*
+#### Maneuvers (Compendium pp. 9–11)
+Grid-representable maneuvers implemented (D1/D2 bends require sub-square precision; deferred to free-movement phase):
 
 | Maneuver | DC | Notes |
 |----------|----|-------|
-| Bend 1–15° | D1 | |
-| Bend 16–30° | D2 | |
-| Bend 31–45° | D3 | current default (one grid step) |
-| Bend 46–60° | D4 | |
-| Bend 61–75° | D5 | |
-| Bend 76–90° | D6 | right-angle turn |
-| Drift | D1 | ¼ sq lateral, same facing |
-| Steep Drift | D3 | ¼–½ sq lateral |
-| Swerve | D(bend+1) | drift + opposite bend same phase |
-| Bootlegger | D7 | reverse direction, 20–35 speed only |
+| Straight | D0 | no facing change |
+| Bend 45° | D3 | one facing step left or right |
+| Bend 90° | D6 | two facing steps; only available when HS ≥ 6 |
+| Drift | D1 | lateral slide, facing unchanged |
+| Steep Drift | D3 | lateral slide at higher cost |
+| Bootlegger | D7 | 180° reversal; speed 2–3 only |
 
-UI: player selects maneuver type before each step
+- **Maneuver mode toggle** — Bend / Drift buttons in sidebar; move highlights colour-coded (cyan=D0, green=D1, blue=D3, orange=D6)
+- **One maneuver per phase per car** — `maneuverUsedThisPhase` flag resets each phase / each car turn
+
+#### Facing-relative keyboard controls
+- ↑ — move forward in current facing direction
+- ← / → — D3 bend left / right
+- Shift+← / Shift+→ — D1 drift left / right
+- Enter / Space — end move phase
+
+#### Component Damage System
+Each component has DP; when armor is breached, overflow damage hits an internal component via a facing-specific hit table (1d6):
+
+| Facing | Roll 1–2 | Roll 3–4 | Roll 5–6 |
+|--------|----------|----------|----------|
+| Front | Engine | Machine Gun | Driver |
+| Back | Engine | Rear-L / Rear-R Tire | Driver |
+| Left | FL / RL Tire | RL Tire | Engine |
+| Right | FR / RR Tire | RR Tire | Engine |
+
+**Component stats (Killer Kart):**
+
+| Component | DP | Effect when destroyed |
+|-----------|----|-----------------------|
+| Engine | 3 | Car disabled (speed 0, alive=false) |
+| Each Tire (×4) | 1 | HC −1; HC=0 → car destroyed |
+| Machine Gun | 3 | Cannot fire |
+
+- Sidebar panels show Engine DP (green/yellow/red), MG DP + ammo, and four tire status squares (■ = OK green, ■ = destroyed red)
+- Repeated hits to already-breached facing deal full damage to components
+
+#### UI improvements
+- Sidebar widened to 440 px; all fonts enlarged for readability
+- Action log entries colour-coded by player (P1 red, P2 blue, system gray)
+- Primary action button (GO / End Move / End Turn) colours match the active player
+
+---
+
+## Roadmap
 
 ### 🔲 v0.4 — Car Variety
 - Road Warrior: speed 12, HC 4, Rocket ×1 (3d6, range 24, single shot)
@@ -110,6 +125,7 @@ UI: player selects maneuver type before each step
 - Debris tokens from destroyed tires
 
 ### 🔲 Future
+- Free movement — sub-square precision enabling D1/D2 bends, swerves, and all Compendium maneuver types
 - 3+ car free-for-all
 - AI opponent (basic threat-angle targeting)
 - Persistent driver prestige between matches

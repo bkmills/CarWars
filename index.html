@@ -64,7 +64,14 @@
       </div>
       <div class="stat-line">
         Speed: <span id="c1-speed-cur">0</span> / <span id="c1-speed-max">15</span>
-        &nbsp;·&nbsp; MG: <span id="c1-w0-ammo">20</span> rds
+        &nbsp;·&nbsp; Engine: <span id="c1-engine-dp" style="color:#2ecc71">3/3</span>
+      </div>
+      <div class="stat-line">
+        MG: <span id="c1-w0-dp" style="color:#2ecc71">3/3</span>dp
+        &nbsp;<span id="c1-w0-ammo">20</span> rds
+        &nbsp;·&nbsp; Tires:
+        <span id="c1-tire-fl" class="tire-dot" title="Front-L">&#9632;</span><span id="c1-tire-fr" class="tire-dot" title="Front-R">&#9632;</span>
+        <span id="c1-tire-rl" class="tire-dot" title="Rear-L">&#9632;</span><span id="c1-tire-rr" class="tire-dot" title="Rear-R">&#9632;</span>
       </div>
     </div>
 
@@ -95,7 +102,14 @@
       </div>
       <div class="stat-line">
         Speed: <span id="c2-speed-cur">0</span> / <span id="c2-speed-max">15</span>
-        &nbsp;·&nbsp; MG: <span id="c2-w0-ammo">20</span> rds
+        &nbsp;·&nbsp; Engine: <span id="c2-engine-dp" style="color:#2ecc71">3/3</span>
+      </div>
+      <div class="stat-line">
+        MG: <span id="c2-w0-dp" style="color:#2ecc71">3/3</span>dp
+        &nbsp;<span id="c2-w0-ammo">20</span> rds
+        &nbsp;·&nbsp; Tires:
+        <span id="c2-tire-fl" class="tire-dot" title="Front-L">&#9632;</span><span id="c2-tire-fr" class="tire-dot" title="Front-R">&#9632;</span>
+        <span id="c2-tire-rl" class="tire-dot" title="Rear-L">&#9632;</span><span id="c2-tire-rr" class="tire-dot" title="Rear-R">&#9632;</span>
       </div>
     </div>
 
@@ -117,10 +131,15 @@
 
       <!-- MOVE phase -->
       <div id="move-controls" style="display:none">
-        <div class="ctrl-label">Click a blue square to move</div>
+        <div id="move-phase-info" class="ctrl-label">Phase 1 of 5</div>
         <div class="moves-disp">Moves left: <strong id="moves-left">0</strong></div>
-        <button id="end-move" class="btn-primary">End Move</button>
-        <div class="hint">Arrow keys / WASD also work</div>
+        <div id="maneuver-btns">
+          <button id="mode-bend"  class="mode-btn active">Bend</button>
+          <button id="mode-drift" class="mode-btn">Drift</button>
+        </div>
+        <button id="do-bootlegger" class="mode-btn boot-btn" style="display:none">Bootlegger D7</button>
+        <button id="end-move" class="btn-primary" style="margin-top:6px">End Move</button>
+        <div class="hint">&#9632;=straight &nbsp;&#9632;=D1 &nbsp;&#9632;=D3 &nbsp;&#9632;=D6</div>
       </div>
 
       <!-- FIRE phase -->

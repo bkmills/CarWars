@@ -34,15 +34,15 @@ html, body {
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */
 #sidebar {
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
+  width: 440px;
+  min-width: 440px;
+  max-width: 440px;
   background: #10101e;
   border-left: 1px solid #22224a;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px;
+  padding: 10px;
   overflow-y: auto;
 }
 
@@ -62,7 +62,7 @@ html, body {
 }
 
 #header-sub {
-  font-size: 10px;
+  font-size: 12px;
   color: #888;
   margin: 3px 0 5px;
 }
@@ -151,18 +151,18 @@ html, body {
 }
 
 .af-label {
-  font-size: 9px;
+  font-size: 11px;
   color: #666;
-  min-width: 22px;
+  min-width: 26px;
   text-align: right;
 }
 .a-mid .af-label:last-child { text-align: left; }
 
 .armor-val {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: bold;
   color: #2ecc71;
-  min-width: 18px;
+  min-width: 22px;
   text-align: center;
   line-height: 1;
 }
@@ -178,9 +178,16 @@ html, body {
 }
 
 .stat-line {
-  font-size: 10px;
+  font-size: 12px;
   color: #999;
-  margin-top: 2px;
+  margin-top: 3px;
+}
+
+.tire-dot {
+  font-size: 10px;
+  color: #2ecc71;
+  margin: 0 1px;
+  cursor: default;
 }
 
 /* ── Phase controls ──────────────────────────────────────────────────────────── */
@@ -191,15 +198,15 @@ html, body {
 }
 
 .ctrl-label {
-  font-size: 10px;
+  font-size: 12px;
   color: #888;
   text-align: center;
   margin-bottom: 6px;
 }
 
 .hint {
-  font-size: 9px;
-  color: #444;
+  font-size: 11px;
+  color: #555;
   text-align: center;
   margin-top: 4px;
 }
@@ -228,28 +235,31 @@ html, body {
 .speed-btn:hover { background: #2a2a4e; }
 
 #speed-select-val {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: bold;
   color: #fff;
-  min-width: 32px;
+  min-width: 36px;
   text-align: center;
 }
 
 /* Buttons */
 .btn-primary {
   width: 100%;
-  padding: 8px;
+  padding: 9px;
   background: #c0392b;
   border: none;
   color: #fff;
   font-family: inherit;
   font-weight: bold;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   border-radius: 3px;
   letter-spacing: 1px;
+  transition: background .15s;
 }
 .btn-primary:hover { background: #a93226; }
+.btn-primary.p2 { background: #2980b9; }
+.btn-primary.p2:hover { background: #2170a0; }
 
 .btn-secondary {
   width: 100%;
@@ -264,22 +274,46 @@ html, body {
 }
 .btn-secondary:hover { color: #ccc; border-color: #5a5a8e; }
 
+/* Maneuver mode buttons */
+#maneuver-btns {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.mode-btn {
+  flex: 1;
+  padding: 4px 6px;
+  background: #1e1e3a;
+  border: 1px solid #3a3a6a;
+  color: #888;
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+.mode-btn:hover:not(:disabled) { color: #ccc; border-color: #5a5a9a; }
+.mode-btn.active  { border-color: #5bc4ef; color: #5bc4ef; background: #141e2a; }
+.mode-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.boot-btn { width: 100%; border-color: #f39c12; color: #f39c12; margin-bottom: 4px; }
+.boot-btn:hover { background: #1e160a; }
+
 /* Moves display */
 .moves-disp {
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   color: #5bc4ef;
   margin-bottom: 6px;
 }
-.moves-disp strong { font-size: 18px; }
+.moves-disp strong { font-size: 22px; }
 
 /* Weapon info */
 .weapon-info {
-  font-size: 10px;
+  font-size: 12px;
   color: #aaa;
   text-align: center;
   margin-bottom: 6px;
-  min-height: 14px;
+  min-height: 16px;
 }
 
 /* ── Action log ──────────────────────────────────────────────────────────────── */
@@ -295,26 +329,38 @@ html, body {
 }
 
 #log-title {
-  font-size: 9px;
-  color: #555;
+  font-size: 11px;
+  color: #666;
   text-transform: uppercase;
   letter-spacing: 2px;
   border-bottom: 1px solid #1a1a30;
-  padding-bottom: 3px;
-  margin-bottom: 4px;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 #action-log {
-  font-size: 10px;
-  color: #999;
+  font-size: 12px;
+  color: #aaa;
   overflow-y: auto;
   flex: 1;
 }
 
 .log-line {
-  padding: 1px 0;
-  border-bottom: 1px solid #14142a;
+  padding: 3px 4px 3px 6px;
+  margin-bottom: 4px;
+  border-left: 2px solid transparent;
   word-break: break-word;
+  line-height: 1.4;
+}
+.log-line.p1 { border-left-color: rgba(231,76,60,0.55);  color: #e8b0a8; }
+.log-line.p2 { border-left-color: rgba(52,152,219,0.55); color: #a8c8e8; }
+.log-line.sys {
+  border-left-color: #333;
+  color: #666;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+  margin-bottom: 6px;
 }
 
 /* ── Bottom bar ──────────────────────────────────────────────────────────────── */
