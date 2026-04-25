@@ -146,14 +146,15 @@ class Car {
     this.spinout       = null;  // { dir, rotDir } — ongoing spinout
     this.fireModifier  = 0;     // 0=normal, -3=*, -6=**, 999=no aimed fire
     this.maneuverUsedThisPhase = false;
-    const edp = cfg.engineDp || 3;
+    const edp = cfg.engineDp || 6;
+    const tdp = cfg.tireDp   || 4;
     this.components = {
       engine: { dp: edp, maxDp: edp, destroyed: false },
       tires: {
-        frontLeft:  { dp: 1, maxDp: 1, destroyed: false },
-        frontRight: { dp: 1, maxDp: 1, destroyed: false },
-        rearLeft:   { dp: 1, maxDp: 1, destroyed: false },
-        rearRight:  { dp: 1, maxDp: 1, destroyed: false },
+        frontLeft:  { dp: tdp, maxDp: tdp, destroyed: false },
+        frontRight: { dp: tdp, maxDp: tdp, destroyed: false },
+        rearLeft:   { dp: tdp, maxDp: tdp, destroyed: false },
+        rearRight:  { dp: tdp, maxDp: tdp, destroyed: false },
       },
     };
   }
