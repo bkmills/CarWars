@@ -25,7 +25,7 @@
         <span id="turn-num-label">Turn</span>
         <span id="turn-num">1</span>
         &nbsp;·&nbsp;
-        <span id="active-name">Killer Kart</span>
+        <span id="active-name">—</span>
         &nbsp;/&nbsp;
         <span id="phase-label">SPEED</span>
       </div>
@@ -39,77 +39,89 @@
 
     <!-- Car 1 panel -->
     <div class="car-panel" id="panel-1">
-      <div class="car-header p1">Killer Kart <span class="player-tag">P1</span></div>
+      <div class="car-header p1">— <span class="player-tag">P1</span></div>
       <div class="armor-grid">
         <div class="armor-cell a-top">
           <span class="af-label">Front</span>
-          <span class="armor-val" id="c1-front">4</span>
+          <span class="armor-val" id="c1-front">—</span>
         </div>
         <div class="armor-cell a-mid">
           <span class="af-label">L</span>
-          <span class="armor-val" id="c1-left">3</span>
+          <span class="armor-val" id="c1-left">—</span>
           <span class="car-icon">&#9632;</span>
-          <span class="armor-val" id="c1-right">3</span>
+          <span class="armor-val" id="c1-right">—</span>
           <span class="af-label">R</span>
         </div>
         <div class="armor-cell a-bot">
           <span class="af-label">Back</span>
-          <span class="armor-val" id="c1-back">3</span>
+          <span class="armor-val" id="c1-back">—</span>
         </div>
       </div>
-      <div class="stat-line">
-        Driver: <span id="c1-driver" style="color:#2ecc71">OK</span>
-        &nbsp;·&nbsp; HC: <span id="c1-hc">3</span>
-        &nbsp;·&nbsp; HS: <span id="c1-hs" style="color:#2ecc71">3</span>
+      <div class="armor-tu">
+        <span class="af-label">Top:</span> <span class="armor-val small" id="c1-top">—</span>
+        &nbsp;&nbsp;
+        <span class="af-label">Under:</span> <span class="armor-val small" id="c1-under">—</span>
       </div>
       <div class="stat-line">
-        Speed: <span id="c1-speed-cur">0</span> / <span id="c1-speed-max">75</span>
-        &nbsp;·&nbsp; Engine: <span id="c1-engine-dp" style="color:#2ecc71">6/6</span>
+        Driver: <span id="c1-driver" style="color:#2ecc71">—</span>
+        &nbsp;·&nbsp; HC: <span id="c1-hc">—</span>
+        &nbsp;·&nbsp; HS: <span id="c1-hs" style="color:#2ecc71">—</span>
       </div>
       <div class="stat-line">
-        MG: <span id="c1-w0-dp" style="color:#2ecc71">3/3</span>dp
-        &nbsp;<span id="c1-w0-ammo">20</span> rds
+        Speed: <span id="c1-speed-cur">0</span> / <span id="c1-speed-max">—</span>
+        &nbsp;·&nbsp; Engine: <span id="c1-engine-dp" style="color:#2ecc71">—</span>
+      </div>
+      <div class="stat-line">
+        MG: <span id="c1-w0-dp" style="color:#2ecc71">—</span>
+        &nbsp;<span id="c1-w0-ammo">—</span> rds
         &nbsp;·&nbsp; Tires:
-        <span id="c1-tire-fl" class="tire-dot" title="Front-L">&#9632;</span><span id="c1-tire-fr" class="tire-dot" title="Front-R">&#9632;</span>
-        <span id="c1-tire-rl" class="tire-dot" title="Rear-L">&#9632;</span><span id="c1-tire-rr" class="tire-dot" title="Rear-R">&#9632;</span>
+        <span id="c1-tire-fl" class="tire-dot" title="FL">&#9632;</span><span id="c1-tire-fr" class="tire-dot" title="FR">&#9632;</span>
+        <span id="c1-tire-rl" class="tire-dot" title="RL">&#9632;</span><span id="c1-tire-rr" class="tire-dot" title="RR">&#9632;</span>
+        <span id="c1-tire-rl2" class="tire-dot" title="RL2" style="display:none">&#9632;</span><span id="c1-tire-rr2" class="tire-dot" title="RR2" style="display:none">&#9632;</span>
       </div>
     </div>
 
     <!-- Car 2 panel -->
     <div class="car-panel" id="panel-2">
-      <div class="car-header p2">Killer Kart <span class="player-tag">P2</span></div>
+      <div class="car-header p2">— <span class="player-tag">P2</span></div>
       <div class="armor-grid">
         <div class="armor-cell a-top">
           <span class="af-label">Front</span>
-          <span class="armor-val" id="c2-front">4</span>
+          <span class="armor-val" id="c2-front">—</span>
         </div>
         <div class="armor-cell a-mid">
           <span class="af-label">L</span>
-          <span class="armor-val" id="c2-left">3</span>
+          <span class="armor-val" id="c2-left">—</span>
           <span class="car-icon">&#9632;</span>
-          <span class="armor-val" id="c2-right">3</span>
+          <span class="armor-val" id="c2-right">—</span>
           <span class="af-label">R</span>
         </div>
         <div class="armor-cell a-bot">
           <span class="af-label">Back</span>
-          <span class="armor-val" id="c2-back">3</span>
+          <span class="armor-val" id="c2-back">—</span>
         </div>
       </div>
-      <div class="stat-line">
-        Driver: <span id="c2-driver" style="color:#2ecc71">OK</span>
-        &nbsp;·&nbsp; HC: <span id="c2-hc">3</span>
-        &nbsp;·&nbsp; HS: <span id="c2-hs" style="color:#2ecc71">3</span>
+      <div class="armor-tu">
+        <span class="af-label">Top:</span> <span class="armor-val small" id="c2-top">—</span>
+        &nbsp;&nbsp;
+        <span class="af-label">Under:</span> <span class="armor-val small" id="c2-under">—</span>
       </div>
       <div class="stat-line">
-        Speed: <span id="c2-speed-cur">0</span> / <span id="c2-speed-max">75</span>
-        &nbsp;·&nbsp; Engine: <span id="c2-engine-dp" style="color:#2ecc71">6/6</span>
+        Driver: <span id="c2-driver" style="color:#2ecc71">—</span>
+        &nbsp;·&nbsp; HC: <span id="c2-hc">—</span>
+        &nbsp;·&nbsp; HS: <span id="c2-hs" style="color:#2ecc71">—</span>
       </div>
       <div class="stat-line">
-        MG: <span id="c2-w0-dp" style="color:#2ecc71">3/3</span>dp
-        &nbsp;<span id="c2-w0-ammo">20</span> rds
+        Speed: <span id="c2-speed-cur">0</span> / <span id="c2-speed-max">—</span>
+        &nbsp;·&nbsp; Engine: <span id="c2-engine-dp" style="color:#2ecc71">—</span>
+      </div>
+      <div class="stat-line">
+        MG: <span id="c2-w0-dp" style="color:#2ecc71">—</span>
+        &nbsp;<span id="c2-w0-ammo">—</span> rds
         &nbsp;·&nbsp; Tires:
-        <span id="c2-tire-fl" class="tire-dot" title="Front-L">&#9632;</span><span id="c2-tire-fr" class="tire-dot" title="Front-R">&#9632;</span>
-        <span id="c2-tire-rl" class="tire-dot" title="Rear-L">&#9632;</span><span id="c2-tire-rr" class="tire-dot" title="Rear-R">&#9632;</span>
+        <span id="c2-tire-fl" class="tire-dot" title="FL">&#9632;</span><span id="c2-tire-fr" class="tire-dot" title="FR">&#9632;</span>
+        <span id="c2-tire-rl" class="tire-dot" title="RL">&#9632;</span><span id="c2-tire-rr" class="tire-dot" title="RR">&#9632;</span>
+        <span id="c2-tire-rl2" class="tire-dot" title="RL2" style="display:none">&#9632;</span><span id="c2-tire-rr2" class="tire-dot" title="RR2" style="display:none">&#9632;</span>
       </div>
     </div>
 
@@ -198,6 +210,152 @@
   <div id="game-over-box">
     <div id="game-over-msg">WINNER!</div>
     <button onclick="document.getElementById('game-over').style.display='none'">View Results</button>
+  </div>
+</div>
+
+<!-- Car builder modal -->
+<div id="car-builder" style="display:none">
+  <div id="car-builder-box">
+    <div id="cb-title">BUILD YOUR CAR &mdash; P<span id="cb-player-label">1</span></div>
+
+    <div id="cb-name-row">
+      Car Name: <input id="cb-name" type="text" maxlength="20" value="Killer Kart" />
+    </div>
+
+    <table id="cb-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Choice</th>
+          <th>Cost</th>
+          <th>Weight</th>
+          <th>Spaces</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Body</td>
+          <td><select id="cb-body">
+            <option value="0">Subcompact</option>
+            <option value="1">Compact</option>
+            <option value="2">Mid-sized</option>
+            <option value="3">Sedan</option>
+            <option value="4">Luxury</option>
+            <option value="5">Station Wagon</option>
+            <option value="6">Pickup</option>
+            <option value="7">Camper</option>
+            <option value="8">Van</option>
+          </select></td>
+          <td id="cb-body-cost">$300</td>
+          <td id="cb-body-wt">1,000</td>
+          <td id="cb-body-sp">7</td>
+        </tr>
+        <tr>
+          <td>Chassis</td>
+          <td><select id="cb-chassis">
+            <option value="0">Light</option>
+            <option value="1" selected>Standard</option>
+            <option value="2">Heavy</option>
+            <option value="3">Extra Heavy</option>
+          </select></td>
+          <td id="cb-chassis-cost">—</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Suspension</td>
+          <td><select id="cb-susp">
+            <option value="0" selected>Light</option>
+            <option value="1">Improved</option>
+            <option value="2">Heavy</option>
+            <option value="3">Off-road</option>
+          </select></td>
+          <td id="cb-susp-cost">$0</td>
+          <td id="cb-susp-wt">—</td>
+          <td id="cb-susp-sp">—</td>
+        </tr>
+        <tr>
+          <td>Power Plant</td>
+          <td><select id="cb-engine">
+            <option value="0">Small (800 PF)</option>
+            <option value="1">Medium (1,400 PF)</option>
+            <option value="2">Large (2,000 PF)</option>
+            <option value="3">Super (2,600 PF)</option>
+            <option value="4">Sport (3,000 PF)</option>
+            <option value="5">Thundercat (6,700 PF)</option>
+          </select></td>
+          <td id="cb-engine-cost">$500</td>
+          <td id="cb-engine-wt">500</td>
+          <td id="cb-engine-sp">3</td>
+        </tr>
+        <tr>
+          <td>Tires</td>
+          <td><select id="cb-tires">
+            <option value="0">Standard (4 dp)</option>
+            <option value="1">Heavy-Duty (6 dp)</option>
+            <option value="2">Puncture-Resistant (9 dp)</option>
+            <option value="3">Solid (12 dp)</option>
+            <option value="4">Plasticore (25 dp)</option>
+          </select></td>
+          <td id="cb-tire-cost">$200</td>
+          <td id="cb-tire-wt">120</td>
+          <td id="cb-tire-sp">—</td>
+        </tr>
+        <tr class="cb-note-row">
+          <td colspan="5" id="cb-tire-count" style="font-size:11px;color:#888;text-align:right">4 tires</td>
+        </tr>
+        <tr>
+          <td>Driver</td>
+          <td style="color:#888;font-size:11px">150 lbs (fixed)</td>
+          <td>—</td>
+          <td>150</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Armor — Front</td>
+          <td><input type="number" id="cb-armor-front" value="4" min="0" /></td>
+          <td id="cb-armor-cost" rowspan="6">—</td>
+          <td id="cb-armor-wt" rowspan="6">—</td>
+          <td id="cb-armor-sp" rowspan="6">—</td>
+        </tr>
+        <tr><td>Armor — Back</td>  <td><input type="number" id="cb-armor-back"  value="3" min="0" /></td></tr>
+        <tr><td>Armor — Left</td>  <td><input type="number" id="cb-armor-left"  value="3" min="0" /></td></tr>
+        <tr><td>Armor — Right</td> <td><input type="number" id="cb-armor-right" value="3" min="0" /></td></tr>
+        <tr><td>Armor — Top</td>   <td><input type="number" id="cb-armor-top"   value="0" min="0" /></td></tr>
+        <tr><td>Armor — Under</td> <td><input type="number" id="cb-armor-under" value="0" min="0" /></td></tr>
+        <tr>
+          <td>Machine Gun</td>
+          <td><label><input type="checkbox" id="cb-mg" checked /> Include</label></td>
+          <td id="cb-mg-gun-cost">$1,000</td>
+          <td id="cb-mg-gun-wt">150</td>
+          <td id="cb-mg-sp">1</td>
+        </tr>
+        <tr>
+          <td style="padding-left:16px" id="cb-ammo-label">&#x21b3; Ammo (20 max)</td>
+          <td><input type="number" id="cb-mg-ammo" value="20" min="0" max="20" /> shots</td>
+          <td id="cb-mg-ammo-cost">$500</td>
+          <td id="cb-mg-ammo-wt">50</td>
+          <td>—</td>
+        </tr>
+        <tr class="totals-row">
+          <td colspan="2">TOTALS</td>
+          <td id="cb-total-cost">—</td>
+          <td id="cb-total-wt">—</td>
+          <td id="cb-total-sp">—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div id="cb-derived">
+      Accel: <span id="cb-accel">—</span>
+      &nbsp;·&nbsp; Top Speed: <span id="cb-topspeed">—</span>
+      &nbsp;·&nbsp; HC: <span id="cb-hc">—</span>
+      &nbsp;·&nbsp; Rev: <span id="cb-maxrev">—</span>
+    </div>
+
+    <div id="cb-warning"></div>
+
+    <button id="cb-confirm" class="btn-primary">Confirm P1 &#x2192;</button>
   </div>
 </div>
 

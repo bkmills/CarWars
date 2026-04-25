@@ -116,6 +116,55 @@ const BASE_SQ   = 20;
 let   SQ        = 20;   // pixels per grid square (mutable for zoom)
 
 // ═══════════════════════════════════════════════════════════════
+// BUILDER DATA (Compendium pp. 67–72)
+// ═══════════════════════════════════════════════════════════════
+
+const BUILDER_DATA = {
+  bodies: [
+    { name:'Subcompact',    price:300,  weight:1000, maxLoad:2300, spacesIn:7,  spacesExt:0,  armorCost:11, armorWt:5  },
+    { name:'Compact',       price:400,  weight:1300, maxLoad:3700, spacesIn:10, spacesExt:0,  armorCost:13, armorWt:6  },
+    { name:'Mid-sized',     price:600,  weight:1600, maxLoad:4800, spacesIn:13, spacesExt:0,  armorCost:16, armorWt:8  },
+    { name:'Sedan',         price:700,  weight:1700, maxLoad:5100, spacesIn:16, spacesExt:0,  armorCost:18, armorWt:9  },
+    { name:'Luxury',        price:800,  weight:1800, maxLoad:5500, spacesIn:19, spacesExt:0,  armorCost:20, armorWt:10 },
+    { name:'Station Wagon', price:800,  weight:1800, maxLoad:5500, spacesIn:14, spacesExt:7,  armorCost:20, armorWt:10 },
+    { name:'Pickup',        price:900,  weight:2100, maxLoad:6500, spacesIn:13, spacesExt:11, armorCost:22, armorWt:11 },
+    { name:'Camper',        price:1400, weight:2300, maxLoad:6500, spacesIn:17, spacesExt:7,  armorCost:30, armorWt:14 },
+    { name:'Van',           price:1000, weight:2000, maxLoad:6000, spacesIn:24, spacesExt:6,  armorCost:30, armorWt:14 },
+  ],
+  // loadMod/priceMod are multipliers applied to body maxLoad/price
+  chassis: [
+    { name:'Light',       loadMod:-0.10, priceMod:-0.20 },
+    { name:'Standard',    loadMod:0,     priceMod:0     },
+    { name:'Heavy',       loadMod:+0.10, priceMod:+0.50 },
+    { name:'Extra Heavy', loadMod:+0.20, priceMod:+1.00 },
+  ],
+  // hc columns: [standard, van/heavy-pickup, subcompact]
+  suspensions: [
+    { name:'Light',    priceMod:0,    hc:[1,0,2] },
+    { name:'Improved', priceMod:1.00, hc:[2,1,3] },
+    { name:'Heavy',    priceMod:1.50, hc:[3,2,4] },
+    { name:'Off-road', priceMod:5.00, hc:[2,1,3] },
+  ],
+  engines: [
+    { name:'Small',      cost:500,   weight:500,  spaces:3, dp:5,  pf:800  },
+    { name:'Medium',     cost:1000,  weight:700,  spaces:4, dp:8,  pf:1400 },
+    { name:'Large',      cost:2000,  weight:900,  spaces:5, dp:10, pf:2000 },
+    { name:'Super',      cost:3000,  weight:1100, spaces:6, dp:12, pf:2600 },
+    { name:'Sport',      cost:6000,  weight:1000, spaces:6, dp:12, pf:3000 },
+    { name:'Thundercat', cost:12000, weight:2000, spaces:8, dp:15, pf:6700 },
+  ],
+  tires: [
+    { name:'Standard',           cost:50,   weight:30,  dp:4  },
+    { name:'Heavy-Duty',         cost:100,  weight:40,  dp:6  },
+    { name:'Puncture-Resistant', cost:200,  weight:50,  dp:9  },
+    { name:'Solid',              cost:500,  weight:75,  dp:12 },
+    { name:'Plasticore',         cost:1000, weight:150, dp:25 },
+  ],
+  mg: { cost:1000, weight:150, spaces:1, dp:3, ammo:20, ammoWeight:2.5, ammoCost:25 },
+  driverWeight: 150,
+};
+
+// ═══════════════════════════════════════════════════════════════
 // CAR CLASS & DEFINITIONS
 // ═══════════════════════════════════════════════════════════════
 
@@ -132,9 +181,9 @@ class Car {
     this.accel    = cfg.accel;
     this.hc       = cfg.hc;
     this.handlingStatus = cfg.hc;
-    this.armor    = { ...cfg.armor };
-    this.maxArmor = { ...cfg.armor };
-    this.breached = { front: false, back: false, left: false, right: false };
+    this.armor    = { front:0, back:0, left:0, right:0, top:0, under:0, ...cfg.armor };
+    this.maxArmor = { front:0, back:0, left:0, right:0, top:0, under:0, ...cfg.armor };
+    this.breached = { front:false, back:false, left:false, right:false, top:false, under:false };
     this.driverHits = 0;
     this.alive    = true;
     this.weapons  = cfg.weapons.map(w => ({
@@ -148,14 +197,21 @@ class Car {
     this.maneuverUsedThisPhase = false;
     const edp = cfg.engineDp || 6;
     const tdp = cfg.tireDp   || 4;
+    const tc  = cfg.tireCount || 4;
+    this.tireCount  = tc;
+    const tireSlots = {
+      frontLeft:  { dp: tdp, maxDp: tdp, destroyed: false },
+      frontRight: { dp: tdp, maxDp: tdp, destroyed: false },
+      rearLeft:   { dp: tdp, maxDp: tdp, destroyed: false },
+      rearRight:  { dp: tdp, maxDp: tdp, destroyed: false },
+      ...(tc >= 6 ? {
+        rearLeft2:  { dp: tdp, maxDp: tdp, destroyed: false },
+        rearRight2: { dp: tdp, maxDp: tdp, destroyed: false },
+      } : {}),
+    };
     this.components = {
       engine: { dp: edp, maxDp: edp, destroyed: false },
-      tires: {
-        frontLeft:  { dp: tdp, maxDp: tdp, destroyed: false },
-        frontRight: { dp: tdp, maxDp: tdp, destroyed: false },
-        rearLeft:   { dp: tdp, maxDp: tdp, destroyed: false },
-        rearRight:  { dp: tdp, maxDp: tdp, destroyed: false },
-      },
+      tires: tireSlots,
     };
   }
 
@@ -172,7 +228,7 @@ const CAR_DEFS = [
     // E-facing: front-left at (4,21); right-perp = S(0,1) → body rows 21-22
     x: 4, y: 21, facing: 2,
     maxSpeed: 75, accel: 15, hc: 3,
-    armor: { front: 4, back: 3, left: 3, right: 3 },
+    armor: { front: 4, back: 3, left: 3, right: 3, top: 0, under: 0 },
     weapons: [
       { name: 'Machine Gun', type: 'mg', range: 32,
         damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
@@ -183,7 +239,7 @@ const CAR_DEFS = [
     // W-facing: front-left at (59,22); right-perp = N(0,-1) → body rows 21-22
     x: 59, y: 22, facing: 6,
     maxSpeed: 75, accel: 15, hc: 3,
-    armor: { front: 4, back: 3, left: 3, right: 3 },
+    armor: { front: 4, back: 3, left: 3, right: 3, top: 0, under: 0 },
     weapons: [
       { name: 'Machine Gun', type: 'mg', range: 32,
         damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
@@ -245,7 +301,9 @@ function _applyTireDamage(car, dmg, msgs) {
     ['frontRight', 'FR Tire'],
     ['rearLeft',   'RL Tire'],
     ['rearRight',  'RR Tire'],
-  ];
+    ['rearLeft2',  'RL2 Tire'],
+    ['rearRight2', 'RR2 Tire'],
+  ].filter(([k]) => car.components.tires[k] !== undefined);
   for (const [key, label] of pairs) {
     const t = car.components.tires[key];
     if (t.destroyed) continue;
@@ -388,6 +446,8 @@ const COMP_TABLE = {
   back:  [null,'engine','engine','engine','tire-rl','tire-rr','driver'],
   left:  [null,'tire-fl','tire-fl','tire-rl','tire-rl','engine','engine'],
   right: [null,'tire-fr','tire-fr','tire-rr','tire-rr','engine','engine'],
+  top:   [null,'driver','driver','engine','engine','weapon','weapon'],
+  under: [null,'engine','engine','tire-fl','tire-fr','tire-rl','tire-rr'],
 };
 
 function hitComponent(car, facing, damage, msgs) {
@@ -457,12 +517,226 @@ function _onComponentDestroyed(car, label, msgs) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CAR BUILDER
+// ═══════════════════════════════════════════════════════════════
+
+function buildCarConfig(sel, color, carId) {
+  const body    = BUILDER_DATA.bodies[sel.bodyIdx];
+  const susp    = BUILDER_DATA.suspensions[sel.suspIdx];
+  const engine  = BUILDER_DATA.engines[sel.engineIdx];
+  const tire    = BUILDER_DATA.tires[sel.tireIdx];
+  const mgData  = BUILDER_DATA.mg;
+
+  const isHeavyBody = sel.bodyIdx >= 6;
+  const isXHeavy    = sel.chassisIdx === 3;
+  const tireCount   = (isHeavyBody && isXHeavy) ? 6 : 4;
+
+  const armorPts = Object.values(sel.armor).reduce((a, b) => a + b, 0);
+  const armorWt  = armorPts * body.armorWt;
+  const tireWt   = tire.weight * tireCount;
+  const mgAmmo   = sel.hasMG ? (sel.mgAmmo !== undefined ? sel.mgAmmo : mgData.ammo) : 0;
+  const mgWt     = sel.hasMG ? (mgData.weight + mgAmmo * mgData.ammoWeight) : 0;
+  const totalWt  = body.weight + engine.weight + armorWt + tireWt + mgWt + BUILDER_DATA.driverWeight;
+
+  const pf = engine.pf;
+  let accel;
+  if      (pf < totalWt / 3) accel = 0;
+  else if (pf < totalWt / 2) accel = 5;
+  else if (pf < totalWt)     accel = 10;
+  else                       accel = 15;
+
+  const maxSpeed   = Math.floor(360 * pf / (pf + totalWt) / 2.5) * 2.5;
+  const maxReverse = Math.floor(maxSpeed / 5);
+
+  const isSubcompact = sel.bodyIdx === 0;
+  const isVanClass   = sel.bodyIdx === 8 || (sel.bodyIdx === 6 && totalWt > 5500);
+  const hcCol        = isSubcompact ? 2 : isVanClass ? 1 : 0;
+  const hc           = susp.hc[hcCol];
+
+  return {
+    id: carId,
+    name: sel.name || ('P' + carId + ' Car'),
+    color,
+    x: carId === 1 ? 4 : 59,
+    y: carId === 1 ? 21 : 22,
+    facing: carId === 1 ? 2 : 6,
+    maxSpeed, accel, maxReverse, hc,
+    armor: { ...sel.armor },
+    engineDp: engine.dp,
+    tireDp:   tire.dp,
+    tireCount,
+    weapons: sel.hasMG ? [{
+      name:'Machine Gun', type:'mg', range:32,
+      damageDice:1, damageSides:6, rof:2, ammo:mgAmmo, dp:mgData.dp,
+    }] : [],
+  };
+}
+
+const CarBuilder = {
+  step:  1,
+  p1cfg: null,
+
+  open(step) {
+    this.step = step;
+    document.getElementById('car-builder').style.display = 'flex';
+    document.getElementById('cb-player-label').textContent = 'P' + step;
+    const confirmBtn = document.getElementById('cb-confirm');
+    confirmBtn.textContent = step === 1 ? 'Confirm P1 \u2192' : 'Start Game \u25ba';
+    confirmBtn.className = 'btn-primary' + (step === 2 ? ' p2' : '');
+
+    document.getElementById('cb-name').value = step === 1 ? 'Killer Kart' : 'Deathmobile';
+    ['cb-body','cb-chassis','cb-susp','cb-engine','cb-tires'].forEach(id => {
+      document.getElementById(id).selectedIndex = 0;
+    });
+    const defaults = { front:4, back:3, left:3, right:3, top:0, under:0 };
+    for (const [f, v] of Object.entries(defaults)) {
+      const el = document.getElementById('cb-armor-' + f);
+      if (el) el.value = v;
+    }
+    document.getElementById('cb-mg').checked = true;
+    this.recalc();
+  },
+
+  _getSel() {
+    return {
+      bodyIdx:    +document.getElementById('cb-body').value,
+      chassisIdx: +document.getElementById('cb-chassis').value,
+      suspIdx:    +document.getElementById('cb-susp').value,
+      engineIdx:  +document.getElementById('cb-engine').value,
+      tireIdx:    +document.getElementById('cb-tires').value,
+      armor: {
+        front: +document.getElementById('cb-armor-front').value || 0,
+        back:  +document.getElementById('cb-armor-back').value  || 0,
+        left:  +document.getElementById('cb-armor-left').value  || 0,
+        right: +document.getElementById('cb-armor-right').value || 0,
+        top:   +document.getElementById('cb-armor-top').value   || 0,
+        under: +document.getElementById('cb-armor-under').value || 0,
+      },
+      hasMG:    document.getElementById('cb-mg').checked,
+      mgAmmo:   Math.max(0, Math.min(20, +document.getElementById('cb-mg-ammo').value || 0)),
+      name:     document.getElementById('cb-name').value.trim(),
+    };
+  },
+
+  recalc() {
+    const sel    = this._getSel();
+    const body   = BUILDER_DATA.bodies[sel.bodyIdx];
+    const chassis= BUILDER_DATA.chassis[sel.chassisIdx];
+    const susp   = BUILDER_DATA.suspensions[sel.suspIdx];
+    const engine = BUILDER_DATA.engines[sel.engineIdx];
+    const tire   = BUILDER_DATA.tires[sel.tireIdx];
+    const mgData = BUILDER_DATA.mg;
+
+    const isHeavyBody = sel.bodyIdx >= 6;
+    const isXHeavy    = sel.chassisIdx === 3;
+    const tireCount   = (isHeavyBody && isXHeavy) ? 6 : 4;
+
+    const chassisCost= Math.round(body.price * chassis.priceMod);
+    const bodyPrice  = body.price + chassisCost;
+    const suspPrice  = Math.round(body.price * susp.priceMod);
+    const armorPts   = Object.values(sel.armor).reduce((a, b) => a + b, 0);
+    const armorCost  = armorPts * body.armorCost;
+    const armorWt    = armorPts * body.armorWt;
+    const tireCost   = tire.cost * tireCount;
+    const tireWt     = tire.weight * tireCount;
+    const mgAmmo     = sel.hasMG ? sel.mgAmmo : 0;
+    const mgCost     = sel.hasMG ? (mgData.cost + mgAmmo * mgData.ammoCost) : 0;
+    const mgWt       = sel.hasMG ? (mgData.weight + mgAmmo * mgData.ammoWeight) : 0;
+    const mgSpaces   = sel.hasMG ? mgData.spaces : 0;
+
+    const totalCost  = bodyPrice + suspPrice + engine.cost + tireCost + armorCost + mgCost;
+    const totalWt    = body.weight + engine.weight + armorWt + tireWt + mgWt + BUILDER_DATA.driverWeight;
+    const totalSp    = engine.spaces + mgSpaces;
+    const maxLoad    = Math.round(body.maxLoad * (1 + chassis.loadMod));
+
+    const pf = engine.pf;
+    let accel;
+    if      (pf < totalWt / 3) accel = 0;
+    else if (pf < totalWt / 2) accel = 5;
+    else if (pf < totalWt)     accel = 10;
+    else                       accel = 15;
+    const maxSpeed   = Math.floor(360 * pf / (pf + totalWt) / 2.5) * 2.5;
+    const maxReverse = Math.floor(maxSpeed / 5);
+
+    const isSubcompact = sel.bodyIdx === 0;
+    const isVanClass   = sel.bodyIdx === 8 || (sel.bodyIdx === 6 && totalWt > 5500);
+    const hcCol        = isSubcompact ? 2 : isVanClass ? 1 : 0;
+    const hc           = susp.hc[hcCol];
+
+    const chassisExtra = Math.round(body.price * chassis.priceMod);
+    setText('cb-body-cost',    '$' + body.price.toLocaleString());
+    setText('cb-chassis-cost', chassisExtra === 0 ? '—' : (chassisExtra > 0 ? '+' : '') + '$' + chassisExtra.toLocaleString());
+    setText('cb-body-wt',     body.weight.toLocaleString());
+    setText('cb-body-sp',     body.spacesIn + (body.spacesExt ? '(+'+body.spacesExt+')' : ''));
+    setText('cb-engine-cost', '$' + engine.cost.toLocaleString());
+    setText('cb-engine-wt',   engine.weight.toLocaleString());
+    setText('cb-engine-sp',   engine.spaces);
+    setText('cb-susp-cost',   '$' + suspPrice.toLocaleString());
+    setText('cb-susp-wt',     '—');
+    setText('cb-susp-sp',     '—');
+    setText('cb-tire-cost',   '$' + tireCost.toLocaleString());
+    setText('cb-tire-wt',     tireWt.toLocaleString());
+    setText('cb-tire-sp',     '—');
+    setText('cb-tire-count',  tireCount + ' tires');
+    setText('cb-armor-cost',  '$' + armorCost.toLocaleString());
+    setText('cb-armor-wt',    armorWt.toLocaleString());
+    setText('cb-armor-sp',    '—');
+    const ammoEl = document.getElementById('cb-mg-ammo');
+    ammoEl.disabled = !sel.hasMG;
+    const ammoMax = mgData.ammo;
+    if (+ammoEl.value > ammoMax) ammoEl.value = ammoMax;
+    if (+ammoEl.value < 0)       ammoEl.value = 0;
+    sel.mgAmmo = +ammoEl.value;
+    const ammoCost = sel.hasMG ? mgAmmo * mgData.ammoCost : 0;
+    const ammoWt   = sel.hasMG ? mgAmmo * mgData.ammoWeight : 0;
+    setText('cb-mg-gun-cost',  sel.hasMG ? '$' + mgData.cost.toLocaleString() : '$0');
+    setText('cb-mg-gun-wt',    sel.hasMG ? mgData.weight : 0);
+    setText('cb-mg-sp',        sel.hasMG ? mgSpaces : '—');
+    setText('cb-mg-ammo-cost', sel.hasMG ? '$' + ammoCost.toLocaleString() : '$0');
+    setText('cb-mg-ammo-wt',   sel.hasMG ? ammoWt : 0);
+    setText('cb-total-cost',  '$' + totalCost.toLocaleString());
+    setText('cb-total-wt',    totalWt.toLocaleString() + ' / ' + maxLoad.toLocaleString() + ' lbs');
+    setText('cb-total-sp',    totalSp + ' / ' + body.spacesIn);
+    setText('cb-accel',    accel === 0 ? 'NONE' : accel + ' mph');
+    setText('cb-topspeed', maxSpeed + ' mph');
+    setText('cb-hc',       hc);
+    setText('cb-maxrev',   maxReverse + ' mph');
+    document.getElementById('cb-accel').style.color = accel === 0 ? '#e74c3c' : '#5bc4ef';
+
+    const overload     = totalWt > maxLoad;
+    const underpowered = accel === 0;
+    const spaceOver    = totalSp > body.spacesIn;
+    let warn = '';
+    if (overload)     warn += 'OVERWEIGHT: ' + totalWt.toLocaleString() + ' > max ' + maxLoad.toLocaleString() + ' lbs.  ';
+    if (underpowered) warn += 'UNDERPOWERED: car cannot move.  ';
+    if (spaceOver)    warn += 'OVER SPACE LIMIT: ' + totalSp + ' > ' + body.spacesIn + ' spaces.  ';
+    const warnEl = document.getElementById('cb-warning');
+    warnEl.textContent   = warn;
+    warnEl.style.display = warn ? 'block' : 'none';
+    document.getElementById('cb-confirm').disabled = !!(overload || underpowered || spaceOver);
+  },
+
+  confirm() {
+    const sel   = this._getSel();
+    const color = this.step === 1 ? '#e74c3c' : '#3498db';
+    const cfg   = buildCarConfig(sel, color, this.step);
+    if (this.step === 1) {
+      this.p1cfg = cfg;
+      this.open(2);
+    } else {
+      document.getElementById('car-builder').style.display = 'none';
+      game.init(this.p1cfg, cfg);
+    }
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
 // GAME STATE
 // ═══════════════════════════════════════════════════════════════
 
 class GameState {
-  constructor() {
-    this.cars            = CAR_DEFS.map(def => new Car(def));
+  constructor(carCfgs) {
+    this.cars            = carCfgs.map(def => new Car(def));
     this.activeIdx       = 0;
     this.phase           = PHASE.SPEED;
     this.turn            = 1;
@@ -583,9 +857,12 @@ class GameState {
     }
 
     if (this.movePhase > 5 || this.moveOrder.length === 0) {
+      msgs.push('\u25b6Turn ' + this.turn + ' \u00b7 Fire');
       this._enterFirePhase();
       return msgs;
     }
+
+    msgs.push('\u25b6Turn ' + this.turn + ' \u00b7 Phase ' + this.movePhase);
 
     // Resolve move order — tie gets a coin flip
     if (this.moveOrder.length === 2 &&
@@ -1231,7 +1508,7 @@ class UI {
 
   _panel(car) {
     const n = car.id;
-    for (const f of ['front','back','left','right']) {
+    for (const f of ['front','back','left','right','top','under']) {
       const el = document.getElementById('c'+n+'-'+f);
       if (!el) continue;
       el.textContent = Math.max(0, car.armor[f]);
@@ -1256,15 +1533,21 @@ class UI {
     const engEl = document.getElementById('c'+n+'-engine-dp');
     if (engEl) {
       const eng = car.components.engine;
-      if (eng.destroyed)       { engEl.textContent = 'DEAD';                engEl.style.color = '#e74c3c'; }
+      if (eng.destroyed)           { engEl.textContent = 'DEAD';                engEl.style.color = '#e74c3c'; }
       else if (eng.dp < eng.maxDp) { engEl.textContent = eng.dp+'/'+eng.maxDp; engEl.style.color = '#f39c12'; }
-      else                     { engEl.textContent = eng.dp+'/'+eng.maxDp; engEl.style.color = '#2ecc71'; }
+      else                         { engEl.textContent = eng.dp+'/'+eng.maxDp; engEl.style.color = '#2ecc71'; }
     }
-    // Tires (FL FR RL RR)
-    const tireKeys = { fl:'frontLeft', fr:'frontRight', rl:'rearLeft', rr:'rearRight' };
-    for (const [k, prop] of Object.entries(tireKeys)) {
+    // Tires — supports 4 or 6
+    const tireKeys = [
+      ['fl','frontLeft'],['fr','frontRight'],['rl','rearLeft'],['rr','rearRight'],
+      ['rl2','rearLeft2'],['rr2','rearRight2'],
+    ];
+    for (const [k, prop] of tireKeys) {
       const el = document.getElementById('c'+n+'-tire-'+k);
-      if (el) el.style.color = car.components.tires[prop].destroyed ? '#e74c3c' : '#2ecc71';
+      if (!el) continue;
+      const t = car.components.tires[prop];
+      el.style.color   = !t ? '#444' : t.destroyed ? '#e74c3c' : '#2ecc71';
+      el.style.display = !t ? 'none' : '';
     }
     // Weapons
     car.weapons.forEach((w, i) => {
@@ -1365,11 +1648,14 @@ class UI {
   log(messages) {
     if (!messages || (Array.isArray(messages) && messages.length === 0)) return;
     if (typeof messages === 'string') messages = [messages];
-    // System separator lines (start with ---) get neutral styling
-    const cls = messages[0] && String(messages[0]).startsWith('---')
+    const defaultCls = messages[0] && String(messages[0]).startsWith('---')
       ? 'sys'
       : 'p' + (this.gs.activeIdx + 1);
-    messages.forEach(m => this.logLines.push({ h: esc(m), c: cls }));
+    messages.forEach(m => {
+      const s   = String(m);
+      const hdr = s.startsWith('\u25b6');
+      this.logLines.push({ h: esc(hdr ? s.slice(1) : s), c: hdr ? 'hdr' : defaultCls });
+    });
     this.logLines = this.logLines.slice(-80);
     const el = document.getElementById('action-log');
     if (el) {
@@ -1396,15 +1682,30 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
 // MAIN — wire everything together
 // ═══════════════════════════════════════════════════════════════
 
-(function() {
+const game = (function() {
   const canvas = document.getElementById('game-canvas');
-  const gs     = new GameState();
-  const grid   = new Grid(canvas, gs);
-  const ui     = new UI(gs);
-
+  let gs, grid, ui;
   let selectedSpeed = 0;
   let zoomLevel = 1.0;
   const ZOOM_STEP = 0.25, ZOOM_MIN = 0.5, ZOOM_MAX = 3.0;
+
+  function init(p1cfg, p2cfg) {
+    gs   = new GameState([p1cfg, p2cfg]);
+    grid = new Grid(canvas, gs);
+    ui   = new UI(gs);
+    selectedSpeed = 0;
+    // Update sidebar panel names to match built cars
+    const h1 = document.querySelector('#panel-1 .car-header');
+    if (h1) h1.firstChild.textContent = p1cfg.name + ' ';
+    const h2 = document.querySelector('#panel-2 .car-header');
+    if (h2) h2.firstChild.textContent = p2cfg.name + ' ';
+    ui.log('Car Wars \u2014 ' + p1cfg.name + ' (P1) vs ' + p2cfg.name + ' (P2)');
+    ui.log('\u25b6Turn 1');
+    ui.log('Set speed and press GO!');
+    render();
+  }
+
+  // ── one-time event wiring ───────────────────────────────────
 
   function setZoom(z) {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -1415,11 +1716,13 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
   }
 
   function render() {
+    if (!gs) return;
     grid.render();
     ui.update();
   }
 
   function syncSpeed() {
+    if (!gs) return;
     const car        = gs.activeCar;
     const wantRev    = selectedSpeed < 0;
     const wantMag    = Math.abs(selectedSpeed);
@@ -1444,7 +1747,7 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
 
   // ── Canvas click ────────────────────────────────────────────
   canvas.addEventListener('click', function(e) {
-    if (gs.gameOver) return;
+    if (!gs || gs.gameOver) return;
     const { col, row } = grid.screenToGrid(e.clientX, e.clientY);
 
     if (gs.phase === PHASE.MOVE) {
@@ -1547,7 +1850,7 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
       const c = gs.activeCar;
       selectedSpeed = c.reverse ? -c.speed : c.speed;
       syncSpeed();
-      ui.log('--- Turn ' + gs.turn + ': P1 & P2 set speeds ---');
+      ui.log('\u25b6Turn ' + gs.turn);
     }
     render();
   }
@@ -1571,12 +1874,12 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
 
   // ── New game ────────────────────────────────────────────────
   document.getElementById('restart-btn').addEventListener('click', function() {
-    location.reload();
+    CarBuilder.open(1);
   });
 
   // ── Keyboard shortcuts ───────────────────────────────────────
   document.addEventListener('keydown', function(e) {
-    if (gs.gameOver) return;
+    if (!gs || gs.gameOver) return;
 
     if (e.key === 'f' || e.key === 'F') {
       document.getElementById('fullscreen-btn').click();
@@ -1658,10 +1961,19 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
     }
   });
 
-  // ── Boot ────────────────────────────────────────────────────
-  ui.log('Car Wars v0.5 \u2014 2\xD74 counter, mph speed, 2-sq moves');
-  ui.log('P1: Killer Kart (red) \u2014 Machine Gun');
-  ui.log('P2: Killer Kart (blue) \u2014 Machine Gun');
-  ui.log('Set speed (0\u201375 mph) and press GO!');
-  render();
+  // ── Car builder wiring ──────────────────────────────────────
+  document.getElementById('car-builder').addEventListener('change', function() {
+    CarBuilder.recalc();
+  });
+  document.getElementById('car-builder').addEventListener('input', function(e) {
+    if (e.target.type === 'number' || e.target.tagName === 'INPUT') CarBuilder.recalc();
+  });
+  document.getElementById('cb-confirm').addEventListener('click', function() {
+    CarBuilder.confirm();
+  });
+
+  // ── Boot: open car builder for P1 ──────────────────────────
+  CarBuilder.open(1);
+
+  return { init };
 })();

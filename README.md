@@ -10,7 +10,32 @@ A browser-based implementation of the **Steve Jackson Games** *Car Wars* tableto
 
 1. Clone or download the repo
 2. Open `index.html` in Chrome, Edge, or Brave
-3. Play hotseat — each player takes a turn on the same machine
+3. Each player builds their car (body, chassis, suspension, power plant, tires, armor, weapon)
+4. Play hotseat — each player takes a turn on the same machine
+
+---
+
+## Car Builder
+
+Before each match, both players build their cars using the pre-game modal. Components are drawn from the *Compendium* tables:
+
+| Component | Options |
+|-----------|---------|
+| Body | Subcompact, Compact, Mid-sized, Sedan, Luxury, Station Wagon, Pickup, Camper, Van |
+| Chassis | Light, Standard, Heavy, Extra Heavy (modifies max load and body cost) |
+| Suspension | Light, Improved, Heavy, Off-road (determines HC) |
+| Power Plant | Small–Thundercat (6 electric options; sets power factors) |
+| Tires | Standard–Plasticore (5 options; Pickup/Camper/Van + X-Heavy chassis = 6 tires) |
+| Armor | 6 facings: Front, Back, Left, Right, Top, Under (no per-facing cap — weight limit only) |
+| Machine Gun | Optional; ammo load 0–20 shots |
+
+The builder shows running **cost / weight / spaces** totals and live-calculates:
+- **Acceleration** — based on power factors vs total weight ratio (5/10/15 mph)
+- **Top Speed** — `360 × PF / (PF + weight)`, rounded down to nearest 2.5 mph
+- **HC** — from suspension type × body class
+- **Max Reverse** — `floor(topSpeed ÷ 5)` mph
+
+Confirms are blocked if the car is overweight, underpowered, or over the space limit.
 
 ---
 
@@ -86,19 +111,21 @@ When armor on a facing is **breached**, overflow damage hits an internal compone
 | Back | Engine, Rear tires, Driver |
 | Left | Front-L tire, Rear-L tire, Engine |
 | Right | Front-R tire, Rear-R tire, Engine |
+| Top | Driver, Engine, Machine Gun |
+| Under | Engine, Front tires, Rear tires |
 
 | Component | DP | Destroyed effect |
 |-----------|-----|-----------------|
-| Engine | 3 | Car disabled |
-| Each tire (×4) | 1 | HC −1; HC=0 → car destroyed |
+| Engine | varies | Car disabled |
+| Each tire (×4 or ×6) | varies | HC −1; HC=0 → car destroyed |
 | Machine Gun | 3 | Cannot fire |
 
-Repeated hits to an already-breached facing deal full damage directly to components.
+Component DP is set by the car builder (power plant and tire type). Repeated hits to an already-breached facing deal full damage directly to components.
 
 ### Combat
 - The Machine Gun fires in a **±45° front arc**
 - **To-hit**: roll 2d6, need 7+ (modified by range, target speed, and attacker crash status)
-- **Win condition**: engine destroyed, all 4 armor facings breached, OR driver takes 2 hits
+- **Win condition**: engine destroyed, all armor facings breached, OR driver takes 2 hits
 
 ---
 
@@ -119,61 +146,46 @@ Repeated hits to an already-breached facing deal full damage directly to compone
 
 ---
 
-## Cars (v0.5)
-
-Both cars are identical — differentiated only by color:
-
-| Stat | Value |
-|------|-------|
-| Max Speed | 75 mph |
-| Accel | 15 mph |
-| Max Reverse | 15 mph |
-| HC | 3 |
-| Armor (F/B/L/R) | 4 / 3 / 3 / 3 |
-| Engine | 3 DP |
-| Tires | 4 × 1 DP |
-| Weapon | Machine Gun — 1d6 dmg, ROF 2, range 32 sq, 20 rds, 3 DP |
-
----
-
 ## Architecture
 
 Single-file vanilla JS — no ES modules, no bundler. Required because Chromium blocks ES6 modules on `file://` URLs.
 
 ```
 CarWars/
-├── index.html       # Layout and DOM structure
+├── index.html       # Layout, DOM structure, car builder modal
 ├── css/
 │   └── style.css    # Dark retro styling
 └── js/
-    └── game.js      # All game logic (~1600 lines)
+    └── game.js      # All game logic (~1950 lines)
 ```
 
-Key classes/functions in `game.js`:
+Key symbols in `game.js`:
 
 | Symbol | Responsibility |
 |--------|---------------|
-| `Car` | State: position, facing, speed, armor, components, weapons, HS, crash state |
+| `BUILDER_DATA` | Compendium tables: bodies, chassis, suspensions, engines, tires, MG |
+| `buildCarConfig()` | Computes car stats from builder selections |
+| `CarBuilder` | Modal UI: open/recalc/confirm flow for P1 then P2 |
+| `Car` | State: position, facing, speed, armor (6 facings), components, weapons, HS, crash state |
 | `GameState` | Turn loop, 5-phase movement, simultaneous order, combat |
 | `Grid` | Canvas rendering (cars, move highlights, fire lines) |
 | `UI` | Sidebar DOM updates, action log, maneuver menu |
 | `crashTable1()` | Crash Table 1 — skids, spinouts, rolls, vaults |
 | `destForManeuver()` | Geometry helper — computes destination for any maneuver key |
+| `game.init()` | Initialises game with two built car configs |
 
 ---
 
 ## Roadmap
-
-See [Plan.md](Plan.md) for the full development plan.
 
 **v0.1** ✅ — Playable duel, phases, fire arcs, armor, criticals  
 **v0.2** ✅ — Accel limits, handling status, control table, momentum, zoom  
 **v0.3** ✅ — 5-phase simultaneous movement, 2×4 car footprint  
 **v0.4** ✅ — Full maneuver types, facing-relative keyboard, component damage system  
 **v0.5** ✅ — Sidebar maneuver panel, reverse driving, Crash Table 1 (skids/spinouts/rolls)  
-**v0.6** 🔲 — Car variety (Road Warrior, car selection screen)  
+**v0.6** ✅ — Car builder (body/chassis/suspension/engine/tires/armor/weapon), 6-facing armor, variable component DP  
 **v0.7** 🔲 — Arena options (walls, debris, starting layouts)  
-**Future** 🔲 — Free movement, AI opponent, 3+ cars, mobile support  
+**Future** 🔲 — Additional weapons, free movement, AI opponent, 3+ cars, mobile support  
 
 ---
 

@@ -382,6 +382,15 @@ html, body {
   margin-top: 6px;
   margin-bottom: 6px;
 }
+.log-line.hdr {
+  border-left-color: #e74c3c;
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 12px;
+  margin-top: 8px;
+  padding-top: 4px;
+  letter-spacing: 1px;
+}
 
 /* ── Bottom bar ──────────────────────────────────────────────────────────────── */
 #bottom-bar {
@@ -430,3 +439,131 @@ html, body {
   letter-spacing: 2px;
 }
 #game-over-box button:hover { background: #a93226; }
+
+/* ── Armor top/under row ────────────────────────────────────────────────────── */
+.armor-tu {
+  text-align: center;
+  font-size: 12px;
+  color: #bbb;
+  margin-bottom: 4px;
+}
+.armor-val.small {
+  font-size: 13px;
+  min-width: 16px;
+}
+
+/* ── Car builder modal ───────────────────────────────────────────────────────── */
+#car-builder {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.90);
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+#car-builder-box {
+  background: #10101e;
+  border: 2px solid #22224a;
+  border-radius: 8px;
+  padding: 20px 24px;
+  max-width: 620px;
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+#cb-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #e74c3c;
+  letter-spacing: 3px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+#cb-name-row {
+  text-align: center;
+  font-size: 12px;
+  color: #bbb;
+  margin-bottom: 10px;
+}
+#cb-name {
+  background: #1e1e3a;
+  border: 1px solid #3a3a6a;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  width: 200px;
+}
+
+#cb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+#cb-table th {
+  color: #888;
+  font-weight: normal;
+  border-bottom: 1px solid #22224a;
+  padding: 4px 6px;
+  text-align: right;
+}
+#cb-table th:first-child,
+#cb-table th:nth-child(2) { text-align: left; }
+#cb-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #181828;
+  text-align: right;
+  color: #ccc;
+  vertical-align: middle;
+}
+#cb-table td:first-child { text-align: left; color: #aaa; }
+#cb-table td:nth-child(2) { text-align: left; }
+#cb-table tr.totals-row td {
+  border-top: 1px solid #3a3a5e;
+  font-weight: bold;
+  color: #fff;
+  padding-top: 6px;
+}
+#cb-table tr.cb-note-row td { border-bottom: none; padding-top: 0; }
+
+#cb-table select {
+  background: #1e1e3a;
+  border: 1px solid #3a3a6a;
+  color: #ccc;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  width: 100%;
+}
+#cb-table input[type=number] {
+  background: #1e1e3a;
+  border: 1px solid #3a3a6a;
+  color: #ccc;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  width: 60px;
+}
+#cb-table input[type=checkbox] { accent-color: #e74c3c; }
+
+#cb-derived {
+  font-size: 12px;
+  color: #5bc4ef;
+  text-align: center;
+  margin: 8px 0 6px;
+}
+
+#cb-warning {
+  color: #e74c3c;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 6px;
+  min-height: 0;
+}
