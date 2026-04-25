@@ -23,57 +23,95 @@ const FACING_VEC = [
 
 const PHASE = { SPEED: 'SPEED', MOVE: 'MOVE', FIRE: 'FIRE' };
 
-// Control table: row index = speed-1 (speed 1→row 0, speed 15→row 14)
+// Control table: row index = Math.ceil(speed/10) - 1  (5-10 mph→row 0 … 95-100 mph→row 9)
 // col index 0 = HS 0, 1 = HS -1, ..., 6 = HS -6
-// Values: 0 = safe, -1 = XX (crash unavoidable), 2-6 = 1d6 roll needed
-// Derived from Car Wars Compendium p.8 (speeds mapped at ×10 mph per speed unit)
+// Values: 0 = safe, -1 = XX (crash unavoidable), 2-6 = roll needed (need ≥ value on 1d6)
+// Source: Car Wars Compendium p.8
 const CONTROL_TABLE = [
-  //    hs: 0    -1   -2   -3   -4   -5   -6
-  /* s1  */ [0,   0,   0,   0,   0,   0,   2],
-  /* s2  */ [0,   0,   0,   0,   0,   2,   3],
-  /* s3  */ [0,   0,   0,   0,   0,   2,   3],
-  /* s4  */ [0,   0,   0,   0,   0,   2,   4],
-  /* s5  */ [0,   0,   0,   0,   2,   3,   4],
-  /* s6  */ [0,   0,   0,   0,   2,   3,   4],
-  /* s7  */ [0,   0,   0,   2,   3,   4,   4],
-  /* s8  */ [0,   0,   0,   2,   3,   4,   5],
-  /* s9  */ [0,   0,   2,   3,   4,   5,   5],
-  /* s10 */ [0,   0,   2,   3,   5,   5,   6],
-  /* s11 */ [0,   0,   2,   4,   5,   6,   6],
-  /* s12 */ [0,   3,   4,   6,   6,  -1,  -1],
-  /* s13 */ [0,   2,   3,   5,   6,  -1,  -1],
-  /* s14 */ [0,   2,   4,   5,  -1,  -1,  -1],
-  /* s15 */ [0,   3,   5,   6,  -1,  -1,  -1],
+  //         hs: 0    -1   -2   -3   -4   -5   -6
+  /*  5-10  */ [0,   0,   0,   0,   0,   0,   2],
+  /* 15-20  */ [0,   0,   0,   0,   0,   2,   3],
+  /* 25-30  */ [0,   0,   0,   0,   0,   2,   4],
+  /* 35-40  */ [0,   0,   0,   0,   2,   3,   4],
+  /* 45-50  */ [0,   0,   0,   2,   3,   4,   5],
+  /* 55-60  */ [0,   0,   2,   3,   4,   4,   5],
+  /* 65-70  */ [0,   0,   2,   3,   4,   5,   6],
+  /* 75-80  */ [0,   0,   3,   4,   5,   5,   6],
+  /* 85-90  */ [0,   2,   3,   5,   5,   6,  -1],
+  /* 95-100 */ [0,   2,   4,   5,   6,   6,  -1],
 ];
 
-function rearSquare(car) {
-  const [fdx, fdy] = FACING_VEC[car.facing];
-  return { x: car.x - fdx, y: car.y - fdy };
+// Collision modifier per speed band (future use). Index matches CONTROL_TABLE rows.
+const CONTROL_MODIFIER = [-3, -2, -1, 0, 1, 1, 2, 2, 2, 3];
+
+// car.x,y = front-LEFT square of car body.
+// Right perpendicular from facing (fdx,fdy): rx = -fdy, ry = fdx.
+// Car occupies 4 rows along facing axis × 2 columns (axis + right-offset) = 8 squares.
+function carSquaresForPos(x, y, facing) {
+  const [fdx, fdy] = FACING_VEC[facing];
+  const rx = -fdy, ry = fdx;
+  const squares = [];
+  for (let i = 0; i < 4; i++) {
+    squares.push({ x: x - i*fdx,    y: y - i*fdy    });
+    squares.push({ x: x - i*fdx+rx, y: y - i*fdy+ry });
+  }
+  return squares;
+}
+function carSquares(car) { return carSquaresForPos(car.x, car.y, car.facing); }
+
+// Given a maneuver key string, return [nx, ny] destination or null (no geometry validation).
+// In reverse mode all forward movement components are negated; DC+1 is handled by getMoveInfo.
+function destForManeuver(key, car, halfMovePhase) {
+  const f = car.facing;
+  const [fdx, fdy] = FACING_VEC[f];
+  const rx = -fdy, ry = fdx;
+  const lx = fdy, ly = -fdx;
+  const bf = car.reverse ? -1 : 1;  // direction of travel multiplier
+  const fv = i => FACING_VEC[((f + i) % 8 + 8) % 8];
+  switch (key) {
+    case 'straight':   { const s = halfMovePhase ? 2 : 4; return [car.x + s*bf*fdx,     car.y + s*bf*fdy    ]; }
+    case 'drift-l':    return [car.x + 4*bf*fdx + lx,                 car.y + 4*bf*fdy + ly               ];
+    case 'drift-r':    return [car.x + 4*bf*fdx + rx,                 car.y + 4*bf*fdy + ry               ];
+    case 'steep-l':    return [car.x + 4*bf*fdx + 2*lx,               car.y + 4*bf*fdy + 2*ly             ];
+    case 'steep-r':    return [car.x + 4*bf*fdx + 2*rx,               car.y + 4*bf*fdy + 2*ry             ];
+    case 'bend45-l':   { const v = fv(-1); return [car.x + 4*bf*v[0], car.y + 4*bf*v[1]]; }
+    case 'bend45-r':   { const v = fv(+1); return [car.x + 4*bf*v[0], car.y + 4*bf*v[1]]; }
+    case 'bend90-l':   { const v = fv(-2); return [car.x + 4*bf*v[0], car.y + 4*bf*v[1]]; }
+    case 'bend90-r':   { const v = fv(+2); return [car.x + 4*bf*v[0], car.y + 4*bf*v[1]]; }
+    case 'swerve45-l': { const v = fv(-1); return [car.x + rx + 4*bf*v[0], car.y + ry + 4*bf*v[1]]; }
+    case 'swerve45-r': { const v = fv(+1); return [car.x + lx + 4*bf*v[0], car.y + ly + 4*bf*v[1]]; }
+    case 'swerve90-l': { const v = fv(-2); return [car.x + rx + 4*bf*v[0], car.y + ry + 4*bf*v[1]]; }
+    case 'swerve90-r': { const v = fv(+2); return [car.x + lx + 4*bf*v[0], car.y + ly + 4*bf*v[1]]; }
+    default: return null;
+  }
 }
 
-// Movement Chart (Compendium p.7): speed 0-15 → squares per phase [1..5]
-// Each row sums to car.speed (total squares/turn unchanged from v0.2)
+// Movement Chart (Compendium p.7): indexed by speed/5 (0=0mph … 15=75mph).
+// Values per phase: 0=no move, 0.5=half-inch straight only (no maneuver),
+//   1=one-inch full move (maneuver OK), 1.5=1"+½" (full then forced ½" straight),
+//   2=two-inch (two sequential full moves, one maneuver per phase).
+// Each row total × 4 squares = total squares per turn (1"=4 squares, ½"=2 squares).
 const PHASE_CHART = [
-  /* s0  */ [0, 0, 0, 0, 0],
-  /* s1  */ [1, 0, 0, 0, 0],
-  /* s2  */ [1, 0, 1, 0, 0],
-  /* s3  */ [1, 0, 1, 0, 1],
-  /* s4  */ [1, 1, 1, 0, 1],
-  /* s5  */ [1, 1, 1, 1, 1],
-  /* s6  */ [2, 1, 1, 1, 1],
-  /* s7  */ [2, 1, 2, 1, 1],
-  /* s8  */ [2, 1, 2, 1, 2],
-  /* s9  */ [2, 2, 2, 1, 2],
-  /* s10 */ [2, 2, 2, 2, 2],
-  /* s11 */ [3, 2, 2, 2, 2],
-  /* s12 */ [3, 2, 3, 2, 2],
-  /* s13 */ [3, 2, 3, 2, 3],
-  /* s14 */ [3, 3, 3, 2, 3],
-  /* s15 */ [3, 3, 3, 3, 3],
+  /*  0  0mph */ [0,   0,   0,   0,   0  ],
+  /*  1  5mph */ [0.5, 0,   0,   0,   0  ],
+  /*  2 10mph */ [1,   0,   0,   0,   0  ],
+  /*  3 15mph */ [1,   0,   0.5, 0,   0  ],
+  /*  4 20mph */ [1,   0,   1,   0,   0  ],
+  /*  5 25mph */ [1,   0,   1,   0,   0.5],
+  /*  6 30mph */ [1,   0,   1,   0,   1  ],
+  /*  7 35mph */ [1,   0.5, 1,   0,   1  ],
+  /*  8 40mph */ [1,   1,   1,   0,   1  ],
+  /*  9 45mph */ [1,   1,   1,   0.5, 1  ],
+  /* 10 50mph */ [1,   1,   1,   1,   1  ],
+  /* 11 55mph */ [1.5, 1,   1,   1,   1  ],
+  /* 12 60mph */ [2,   1,   1,   1,   1  ],
+  /* 13 65mph */ [2,   1,   1.5, 1,   1  ],
+  /* 14 70mph */ [2,   1,   2,   1,   1  ],
+  /* 15 75mph */ [2,   1,   2,   1,   1.5],
 ];
 
-const GRID_COLS = 44;
-const GRID_ROWS = 32;
+const GRID_COLS = 64;
+const GRID_ROWS = 44;
 const BASE_SQ   = 20;
 let   SQ        = 20;   // pixels per grid square (mutable for zoom)
 
@@ -103,6 +141,10 @@ class Car {
       ...w, shotsThisTurn: 0,
       dp: w.dp || 3, maxDp: w.dp || 3, destroyed: false,
     }));
+    this.reverse    = false;
+    this.crashPending  = null;  // { type, dir } — skid applied at start of car's next move
+    this.spinout       = null;  // { dir, rotDir } — ongoing spinout
+    this.fireModifier  = 0;     // 0=normal, -3=*, -6=**, 999=no aimed fire
     this.maneuverUsedThisPhase = false;
     const edp = cfg.engineDp || 3;
     this.components = {
@@ -126,21 +168,23 @@ class Car {
 const CAR_DEFS = [
   {
     id: 1, name: 'Killer Kart', color: '#e74c3c',
-    x: 4, y: 15, facing: 2,   // starts facing E
-    maxSpeed: 15, accel: 3, hc: 3,
+    // E-facing: front-left at (4,21); right-perp = S(0,1) → body rows 21-22
+    x: 4, y: 21, facing: 2,
+    maxSpeed: 75, accel: 15, hc: 3,
     armor: { front: 4, back: 3, left: 3, right: 3 },
     weapons: [
-      { name: 'Machine Gun', type: 'mg', range: 8,
+      { name: 'Machine Gun', type: 'mg', range: 32,
         damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
     ],
   },
   {
     id: 2, name: 'Killer Kart', color: '#3498db',
-    x: 40, y: 15, facing: 6,  // starts facing W
-    maxSpeed: 15, accel: 3, hc: 3,
+    // W-facing: front-left at (59,22); right-perp = N(0,-1) → body rows 21-22
+    x: 59, y: 22, facing: 6,
+    maxSpeed: 75, accel: 15, hc: 3,
     armor: { front: 4, back: 3, left: 3, right: 3 },
     weapons: [
-      { name: 'Machine Gun', type: 'mg', range: 8,
+      { name: 'Machine Gun', type: 'mg', range: 32,
         damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
     ],
   },
@@ -159,44 +203,124 @@ function rollDice(num, sides) {
 // ── Handling / Control ───────────────────────────────────────────
 
 function decelDC(extraDecel) {
-  // DC for decelerating more than safe amount (safeDecel = car.accel)
-  if (extraDecel <= 1) return 1;
-  if (extraDecel <= 2) return 2;
-  if (extraDecel <= 3) return 3;
-  if (extraDecel <= 5) return 5;
+  // extraDecel in mph beyond safe decel (car.accel = 15 mph)
+  if (extraDecel <=  5) return 1;
+  if (extraDecel <= 10) return 2;
+  if (extraDecel <= 15) return 3;
+  if (extraDecel <= 25) return 5;
   return 7;
 }
 
-function applyManeuver(car, dc, msgs) {
+function applyManeuver(car, dc, msgs, preFacing) {
   if (car.isDestroyed()) return;
+  const pre = preFacing !== undefined ? preFacing : car.facing;
   car.handlingStatus = Math.max(-6, car.handlingStatus - dc);
-  msgs.push('D' + dc + ' maneuver → HS: ' + car.handlingStatus);
-  checkControl(car, msgs);
+  msgs.push('D' + dc + ' maneuver \u2192 HS: ' + car.handlingStatus);
+  checkControl(car, msgs, dc, pre);
 }
 
-function checkControl(car, msgs) {
+function checkControl(car, msgs, crashDC, preFacing) {
   if (car.speed === 0 || car.handlingStatus >= 1) return;
-  const bandIdx  = Math.max(0, Math.min(14, car.speed - 1));
-  const hsCol    = Math.min(6, -car.handlingStatus);
-  const needed   = CONTROL_TABLE[bandIdx][hsCol];
+  const bandIdx = Math.max(0, Math.min(9, Math.ceil(car.speed / 10) - 1));
+  const hsCol   = Math.min(6, -car.handlingStatus);
+  const needed  = CONTROL_TABLE[bandIdx][hsCol];
   if (needed === 0) return;
+  const dc  = crashDC   !== undefined ? crashDC   : 0;
+  const pre = preFacing !== undefined ? preFacing : car.facing;
   if (needed === -1) {
-    msgs.push(car.name + ' — XX: loss of control!');
-    loseControl(car, msgs);
+    msgs.push(car.name + ' \u2014 XX: loss of control!');
+    crashTable1(car, dc, pre, msgs);
     return;
   }
   const roll = Math.floor(Math.random() * 6) + 1;
   msgs.push(car.name + ' control roll: need ' + needed + '+, rolled ' + roll +
-            ' → ' + (roll >= needed ? 'OK' : 'LOSE CONTROL!'));
-  if (roll < needed) loseControl(car, msgs);
+            ' \u2192 ' + (roll >= needed ? 'OK' : 'LOSE CONTROL!'));
+  if (roll < needed) crashTable1(car, dc, pre, msgs);
 }
 
-function loseControl(car, msgs) {
-  const dir = Math.random() < 0.5 ? 2 : -2; // 90° spin
-  car.facing = (car.facing + dir + 8) % 8;
-  car.speed  = Math.floor(car.speed / 2);
-  msgs.push(car.name + ' spins! Facing → ' + FACING_NAMES[car.facing] +
-            ', speed → ' + car.speed);
+function _applyTireDamage(car, dmg, msgs) {
+  const pairs = [
+    ['frontLeft',  'FL Tire'],
+    ['frontRight', 'FR Tire'],
+    ['rearLeft',   'RL Tire'],
+    ['rearRight',  'RR Tire'],
+  ];
+  for (const [key, label] of pairs) {
+    const t = car.components.tires[key];
+    if (t.destroyed) continue;
+    t.dp = Math.max(0, t.dp - dmg);
+    if (t.dp <= 0) {
+      t.dp = 0; t.destroyed = true;
+      _onComponentDestroyed(car, label, msgs);
+    }
+  }
+}
+
+// Crash Table 1 (Skids & Rolls) — Compendium p.14.
+// Roll = 2d6 + CONTROL_MODIFIER[bandIdx] + (crashDC - 3).
+function crashTable1(car, crashDC, preFacing, msgs) {
+  const bandIdx = Math.max(0, Math.min(9, Math.ceil(car.speed / 10) - 1));
+  const mod     = CONTROL_MODIFIER[bandIdx] + (crashDC - 3);
+  const roll    = rollDice(2, 6).total;
+  const total   = Math.max(2, roll + mod);
+  const modStr  = mod !== 0 ? (mod > 0 ? '+' : '') + mod : '';
+  msgs.push(car.name + ' — Crash Table 1: 2d6=' + roll + modStr + '=' + total);
+
+  if (total <= 2) {
+    // Trivial skid: ¼" in pre-maneuver dir. *
+    car.crashPending = { type: 'trivial', dir: preFacing };
+    car.fireModifier = Math.min(car.fireModifier, -3);
+    msgs.push('\u25b6 Trivial skid (*) — \u00bc" skid next move, aimed fire \u22123');
+  } else if (total <= 4) {
+    // Minor skid: ½" in pre-maneuver dir, speed -5. **
+    car.crashPending = { type: 'minor', dir: preFacing };
+    car.speed = Math.max(0, car.speed - 5);
+    car.fireModifier = Math.min(car.fireModifier, -6);
+    msgs.push('\u25b6 Minor skid (**) — \u00bd" skid next move, speed \u22125 mph \u2192 ' + car.speed + ' mph, aimed fire \u22126');
+  } else if (total <= 6) {
+    // Moderate skid: ¾", tires -1, speed -10, trivial next. **
+    car.crashPending = { type: 'moderate', dir: preFacing };
+    car.speed = Math.max(0, car.speed - 10);
+    car.fireModifier = Math.min(car.fireModifier, -6);
+    _applyTireDamage(car, 1, msgs);
+    msgs.push('\u25b6 Moderate skid (**) — \u00be" skid next move, tires \u22121 DP, speed \u221210 mph \u2192 ' + car.speed + ' mph, aimed fire \u22126');
+  } else if (total <= 8) {
+    // Severe skid: 1", tires -2, speed -20, minor next. ***
+    car.crashPending = { type: 'severe', dir: preFacing };
+    car.speed = Math.max(0, car.speed - 20);
+    car.fireModifier = 999;
+    _applyTireDamage(car, 2, msgs);
+    msgs.push('\u25b6 Severe skid (***) — 1" skid next move, tires \u22122 DP, speed \u221220 mph \u2192 ' + car.speed + ' mph, no aimed fire');
+  } else if (total <= 10) {
+    // Spinout: 90° spin, 1"/phase in pre-man dir, tires -1d, decel 20/turn. ***
+    const rotDir  = Math.random() < 0.5 ? 2 : -2;
+    const tireRoll = rollDice(1, 6).total;
+    car.spinout = { dir: preFacing, rotDir };
+    car.fireModifier = 999;
+    _applyTireDamage(car, tireRoll, msgs);
+    msgs.push('\u25b6 SPINOUT (***) — 90\xb0 spin + 1"/phase, tires \u2212' + tireRoll + ' DP, decel 20 mph/turn, no aimed fire');
+  } else if (total <= 14) {
+    // Roll: car rolls over, 1d damage each facing, decel 20/turn. ***
+    const rotDir = Math.random() < 0.5 ? 2 : -2;
+    car.spinout  = { dir: preFacing, rotDir };
+    car.fireModifier = 999;
+    for (const face of ['front', 'back', 'left', 'right']) {
+      const d = rollDice(1, 6).total;
+      msgs.push(...applyDamage(car, d, face));
+    }
+    if (total >= 13) msgs.push('\u25b6 ROLLS OVER — FIRE CHECK: ' + (Math.floor(Math.random() * 6) + 1 >= 4 ? 'BURNING!' : 'no fire'));
+    msgs.push('\u25b6 CAR ROLLS (***) — 1d dmg all facings, decel 20 mph/turn, no aimed fire');
+  } else {
+    // Vault: vaults into air, 3d tires, 1d each facing. ***
+    const rotDir = Math.random() < 0.5 ? 2 : -2;
+    car.spinout  = { dir: preFacing, rotDir };
+    car.fireModifier = 999;
+    _applyTireDamage(car, rollDice(3, 6).total, msgs);
+    for (const face of ['front', 'back', 'left', 'right']) {
+      msgs.push(...applyDamage(car, rollDice(1, 6).total, face));
+    }
+    msgs.push('\u25b6 VAULT (***) — 3d tire dmg, 1d all facings, no aimed fire');
+  }
 }
 
 function checkFireArc(attacker, target, weapon) {
@@ -214,10 +338,12 @@ function checkFireArc(attacker, target, weapon) {
   return { canFire: true, dist };
 }
 
-function calcToHit(target, dist) {
+function calcToHit(target, dist, fireModifier) {
+  if (fireModifier >= 999) return 999;
   let toHit = 7;
   toHit += Math.max(0, Math.floor((dist - 4) / 4));
   if (target.speed === 0) toHit -= 1;
+  if (fireModifier) toHit -= fireModifier;  // -3 → +3, -6 → +6 (harder)
   return Math.max(2, Math.min(12, toHit));
 }
 
@@ -335,18 +461,46 @@ function _onComponentDestroyed(car, label, msgs) {
 
 class GameState {
   constructor() {
-    this.cars           = CAR_DEFS.map(def => new Car(def));
-    this.activeIdx      = 0;
-    this.phase          = PHASE.SPEED;
-    this.turn           = 1;
-    this.movesRemaining = 0;
-    this.gameOver       = false;
-    this.winner         = null;
+    this.cars            = CAR_DEFS.map(def => new Car(def));
+    this.activeIdx       = 0;
+    this.phase           = PHASE.SPEED;
+    this.turn            = 1;
+    this.movesRemaining  = 0;
+    this.gameOver        = false;
+    this.winner          = null;
     // Move sub-state
-    this.movePhase      = 0;   // 1-5
-    this.moveOrder      = [];  // car indices sorted faster-first for current phase
-    this.moveOrderPos   = 0;
-    this.maneuverMode   = 'bend';  // 'bend' | 'drift'
+    this.movePhase       = 0;      // 1-5
+    this.moveOrder       = [];
+    this.moveOrderPos    = 0;
+    this.halfMovePhase   = false;  // current move is a ½" straight-only move
+    this.halfMovePending = false;  // after the current full move, a forced ½" follows (1½" phase)
+    this.selectedManeuver = null;  // key of maneuver chosen in sidebar; null = choosing
+  }
+
+  // Set movesRemaining + half-move flags from a PHASE_CHART cell value.
+  _setPhaseMove(car, phIdx) {
+    const v = PHASE_CHART[car.speed / 5][phIdx];
+    if (v === 0.5) {
+      this.movesRemaining  = 1;
+      this.halfMovePhase   = true;
+      this.halfMovePending = false;
+    } else if (v === 1.5) {
+      this.movesRemaining  = 2;   // full move first, then forced ½"
+      this.halfMovePhase   = false;
+      this.halfMovePending = true;
+    } else if (v === 2) {
+      this.movesRemaining  = 2;
+      this.halfMovePhase   = false;
+      this.halfMovePending = false;
+    } else if (v === 1) {
+      this.movesRemaining  = 1;
+      this.halfMovePhase   = false;
+      this.halfMovePending = false;
+    } else {
+      this.movesRemaining  = 0;
+      this.halfMovePhase   = false;
+      this.halfMovePending = false;
+    }
   }
 
   get activeCar() { return this.cars[this.activeIdx]; }
@@ -354,32 +508,50 @@ class GameState {
 
   // ── Speed declaration (both players declare before movement) ────
 
-  setSpeed(speed) {
-    const car       = this.activeCar;
-    const prevSpeed = car.speed;
-    const msgs      = [];
+  // signedSpeed: positive = forward, negative = reverse.
+  // car.speed always stores the magnitude; car.reverse stores direction.
+  setSpeed(signedSpeed) {
+    const car         = this.activeCar;
+    const prevMag     = car.speed;
+    const prevReverse = car.reverse;
+    const msgs        = [];
 
-    const maxThisTurn = Math.min(car.maxSpeed, prevSpeed + car.accel);
-    if (speed > maxThisTurn) {
-      speed = maxThisTurn;
-      msgs.push('Accel limit: max speed this turn is ' + speed);
+    const wantReverse = signedSpeed < 0;
+    let   wantMag     = Math.abs(signedSpeed);
+
+    // Direction switch requires stopping first
+    if (wantReverse !== prevReverse && prevMag > 0) {
+      msgs.push(car.name + ': must reach 0 mph before switching direction');
+      wantMag = 0;
     }
-    car.speed = Math.max(0, speed);
 
-    const decelAmt = prevSpeed - car.speed;
+    const revMax      = Math.floor(car.maxSpeed / 5);
+    const maxMag      = wantReverse ? revMax : car.maxSpeed;
+    const maxThisTurn = Math.min(maxMag, prevMag + car.accel);
+    if (wantMag > maxThisTurn) {
+      wantMag = maxThisTurn;
+      msgs.push('Accel limit: max ' + (wantReverse ? '\u2212' : '') + wantMag + ' mph this turn');
+    }
+    wantMag = Math.max(0, Math.min(maxMag, wantMag));
+
+    car.speed   = wantMag;
+    car.reverse = wantReverse && wantMag > 0;
+
+    const decelAmt = prevMag - wantMag;
     if (decelAmt > car.accel) {
       const dc = decelDC(decelAmt - car.accel);
-      msgs.push(car.name + ' emergency brake \u2212' + decelAmt + ' (D' + dc + ')');
-      applyManeuver(car, dc, msgs);
+      msgs.push(car.name + ' emergency brake \u2212' + decelAmt + ' mph (D' + dc + ')');
+      applyManeuver(car, dc, msgs, car.facing);
+      this._checkDestroyed(msgs);
     }
-    msgs.unshift(car.name + ' sets speed to ' + car.speed);
+    msgs.unshift(car.name + ' sets speed to ' +
+      (car.reverse ? '\u2212' : '') + car.speed + ' mph' +
+      (car.reverse ? ' (REVERSE)' : ''));
 
     if (this.activeIdx === 0) {
-      // P1 declared — now P2 declares
       this.activeIdx      = 1;
       this.movesRemaining = 0;
     } else {
-      // P2 declared — start movement phases
       msgs.push(...this._enterMovePhase());
     }
     return msgs;
@@ -401,7 +573,7 @@ class GameState {
       this.moveOrder = [];
       for (let i = 0; i < this.cars.length; i++) {
         const car = this.cars[i];
-        if (!car.isDestroyed() && car.speed > 0 && PHASE_CHART[car.speed][phIdx] > 0) {
+        if (!car.isDestroyed() && car.speed > 0 && PHASE_CHART[car.speed / 5][phIdx] > 0) {
           this.moveOrder.push(i);
         }
       }
@@ -426,9 +598,14 @@ class GameState {
 
     this.moveOrderPos                    = 0;
     this.activeIdx                       = this.moveOrder[0];
-    this.movesRemaining                  = PHASE_CHART[this.activeCar.speed][this.movePhase - 1];
     this.activeCar.maneuverUsedThisPhase = false;
-    this.maneuverMode                    = 'bend';
+
+    this._setPhaseMove(this.activeCar, this.movePhase - 1);
+    const crashMsgs = this._applyCrashEffects();
+    if (crashMsgs.length > 0) {
+      msgs.push(...crashMsgs);
+      if (this.movesRemaining <= 0) msgs.push(...this._advanceMover());
+    }
     return msgs;
   }
 
@@ -436,79 +613,162 @@ class GameState {
     this.moveOrderPos++;
     if (this.moveOrderPos < this.moveOrder.length) {
       this.activeIdx                       = this.moveOrder[this.moveOrderPos];
-      this.movesRemaining                  = PHASE_CHART[this.activeCar.speed][this.movePhase - 1];
       this.activeCar.maneuverUsedThisPhase = false;
-      this.maneuverMode                    = 'bend';
-      return [];
+      this._setPhaseMove(this.activeCar, this.movePhase - 1);
+      const crashMsgs = this._applyCrashEffects();
+      if (crashMsgs.length > 0 && this.movesRemaining <= 0) {
+        return [...crashMsgs, ...this._advanceMover()];
+      }
+      return crashMsgs;
     } else {
       this.movePhase++;
       return this._startMovePhase();
     }
   }
 
-  // Returns { maneuverDC, newFacing, absDiff } or null if the move is illegal.
+  // Returns { maneuverDC, newFacing, isDrift } or null if the move is illegal.
+  // Full move = 1" = 4 squares; half-move = ½" = 2 squares (straight only, no maneuver).
+  // In reverse: movement direction is negated; all maneuver DCs are +1.
   getMoveInfo(col, row) {
     if (this.phase !== PHASE.MOVE || this.movesRemaining <= 0) return null;
     const car = this.activeCar;
-    const dc = col - car.x, dr = row - car.y;
-    if (Math.abs(dc) > 1 || Math.abs(dr) > 1 || (dc === 0 && dr === 0)) return null;
-    if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return null;
+    const f   = car.facing;
+    const [fdx, fdy] = FACING_VEC[f];
+    const bf  = car.reverse ? -1 : 1;  // forward direction multiplier
+    const rDC = car.reverse ? 1 : 0;   // DC penalty for reverse
 
-    const e = this.enemyCar;
-    const er = rearSquare(e);
-    if ((col === e.x && row === e.y) || (col === er.x && row === er.y)) return null;
+    const _checkPos = (cx, cy, facing) => {
+      const sqs = carSquaresForPos(cx, cy, facing);
+      for (const sq of sqs)
+        if (sq.x < 0 || sq.x >= GRID_COLS || sq.y < 0 || sq.y >= GRID_ROWS) return false;
+      const eSqs = carSquares(this.enemyCar);
+      for (const ns of sqs) for (const es of eSqs)
+        if (ns.x === es.x && ns.y === es.y) return false;
+      return true;
+    };
 
-    let moveFacing = -1;
-    for (let f = 0; f < 8; f++) {
-      if (FACING_VEC[f][0] === dc && FACING_VEC[f][1] === dr) { moveFacing = f; break; }
+    if (this.halfMovePhase) {
+      if (col !== car.x + 2*bf*fdx || row !== car.y + 2*bf*fdy) return null;
+      if (!_checkPos(col, row, f)) return null;
+      return { maneuverDC: 0, newFacing: f, isDrift: false };
     }
-    if (moveFacing === -1) return null;
 
-    // Shortest angular distance from current facing (0, 1, or 2)
-    const raw     = (moveFacing - car.facing + 8) % 8;
-    const absDiff = Math.min(raw, 8 - raw);
-    if (absDiff > 2) return null;  // can't turn > 90° in one step
+    const rx = -fdy, ry =  fdx;
+    const lx =  fdy, ly = -fdx;
+    const dc = col - car.x, dr = row - car.y;
 
-    // Maneuvers require maneuverUsedThisPhase to be false
-    if (absDiff > 0 && car.maneuverUsedThisPhase) return null;
+    // Straight
+    if (dc === 4*bf*fdx && dr === 4*bf*fdy) {
+      if (!_checkPos(col, row, f)) return null;
+      return { maneuverDC: 0, newFacing: f, isDrift: false };
+    }
 
-    // New facing: bend changes it; drift keeps it
-    const newFacing = (absDiff === 0 || this.maneuverMode === 'drift')
-      ? car.facing
-      : moveFacing;
+    if (!car.maneuverUsedThisPhase) {
+      // Drift D1 (D2 in reverse)
+      if ((dc === 4*bf*fdx+lx && dr === 4*bf*fdy+ly) || (dc === 4*bf*fdx+rx && dr === 4*bf*fdy+ry)) {
+        if (!_checkPos(col, row, f)) return null;
+        return { maneuverDC: 1+rDC, newFacing: f, isDrift: true };
+      }
+      // Steep Drift D3 (D4 in reverse)
+      if ((dc === 4*bf*fdx+2*lx && dr === 4*bf*fdy+2*ly) || (dc === 4*bf*fdx+2*rx && dr === 4*bf*fdy+2*ry)) {
+        if (!_checkPos(col, row, f)) return null;
+        return { maneuverDC: 3+rDC, newFacing: f, isDrift: true };
+      }
+      // Bends: 4 sq in new facing direction (negated in reverse)
+      const bends = [
+        { nf: (f-1+8)%8, cost: 3 }, { nf: (f+1)%8,   cost: 3 },
+        { nf: (f-2+8)%8, cost: 6 }, { nf: (f+2)%8,   cost: 6 },
+      ];
+      for (const b of bends) {
+        const [bx, by] = FACING_VEC[b.nf];
+        if (dc === 4*bf*bx && dr === 4*bf*by) {
+          if (!_checkPos(col, row, b.nf)) return null;
+          return { maneuverDC: b.cost+rDC, newFacing: b.nf, isDrift: false };
+        }
+      }
+      // Swerves: lateral offset + bend (negated in reverse)
+      const swerves = [
+        { latX: rx, latY: ry, nf: (f-1+8)%8, cost: 4 },
+        { latX: lx, latY: ly, nf: (f+1)%8,   cost: 4 },
+        { latX: rx, latY: ry, nf: (f-2+8)%8, cost: 7 },
+        { latX: lx, latY: ly, nf: (f+2)%8,   cost: 7 },
+      ];
+      for (const s of swerves) {
+        const [bx, by] = FACING_VEC[s.nf];
+        if (dc === s.latX + 4*bf*bx && dr === s.latY + 4*bf*by) {
+          if (!_checkPos(col, row, s.nf)) return null;
+          return { maneuverDC: s.cost+rDC, newFacing: s.nf, isDrift: false, isSwerve: true };
+        }
+      }
+    }
 
-    // Rear square after the move must stay on map
-    const newRearX = col - FACING_VEC[newFacing][0];
-    const newRearY = row - FACING_VEC[newFacing][1];
-    if (newRearX < 0 || newRearX >= GRID_COLS || newRearY < 0 || newRearY >= GRID_ROWS) return null;
-
-    // DC by mode and angle
-    let maneuverDC = 0;
-    if (absDiff === 1) maneuverDC = this.maneuverMode === 'drift' ? 1 : 3;
-    else if (absDiff === 2) maneuverDC = this.maneuverMode === 'drift' ? 3 : 6;
-
-    return { maneuverDC, newFacing, absDiff };
+    return null;
   }
 
   canMoveTo(col, row) { return this.getMoveInfo(col, row) !== null; }
 
+  // Returns true if the active car has at least one legal destination this sub-move.
+  hasValidMoves() {
+    if (this.phase !== PHASE.MOVE || this.movesRemaining <= 0) return false;
+    const car = this.activeCar;
+    const f   = car.facing;
+    const [fdx, fdy] = FACING_VEC[f];
+    const bf  = car.reverse ? -1 : 1;
+    const rx = -fdy, ry = fdx;
+    const lx = fdy, ly = -fdx;
+    const fv = i => FACING_VEC[((f + i) % 8 + 8) % 8];
+    const candidates = this.halfMovePhase ? [
+      [car.x + 2*bf*fdx, car.y + 2*bf*fdy],
+    ] : [
+      [car.x + 4*bf*fdx,               car.y + 4*bf*fdy              ],
+      [car.x + 4*bf*fdx + lx,          car.y + 4*bf*fdy + ly         ],
+      [car.x + 4*bf*fdx + rx,          car.y + 4*bf*fdy + ry         ],
+      [car.x + 4*bf*fdx + 2*lx,        car.y + 4*bf*fdy + 2*ly       ],
+      [car.x + 4*bf*fdx + 2*rx,        car.y + 4*bf*fdy + 2*ry       ],
+      [car.x + 4*bf*fv(-1)[0],         car.y + 4*bf*fv(-1)[1]        ],
+      [car.x + 4*bf*fv(+1)[0],         car.y + 4*bf*fv(+1)[1]        ],
+      [car.x + 4*bf*fv(-2)[0],         car.y + 4*bf*fv(-2)[1]        ],
+      [car.x + 4*bf*fv(+2)[0],         car.y + 4*bf*fv(+2)[1]        ],
+      [car.x + rx + 4*bf*fv(-1)[0],    car.y + ry + 4*bf*fv(-1)[1]   ],
+      [car.x + lx + 4*bf*fv(+1)[0],    car.y + ly + 4*bf*fv(+1)[1]   ],
+      [car.x + rx + 4*bf*fv(-2)[0],    car.y + ry + 4*bf*fv(-2)[1]   ],
+      [car.x + lx + 4*bf*fv(+2)[0],    car.y + ly + 4*bf*fv(+2)[1]   ],
+    ];
+    return candidates.some(([c, r]) => this.getMoveInfo(c, r) !== null);
+  }
+
   moveActiveCar(col, row) {
-    const info = this.getMoveInfo(col, row);
-    const car  = this.activeCar;
+    const info       = this.getMoveInfo(col, row);
+    const car        = this.activeCar;
+    const wasHalf    = this.halfMovePhase;
+    const origFacing = car.facing;
+    this.selectedManeuver = null;
     car.x      = col;
     car.y      = row;
     car.facing = info.newFacing;
     this.movesRemaining--;
-    const msgs = [];
 
+    // After the full move in a 1½" phase, the next sub-move becomes a forced ½" straight.
+    if (this.halfMovePending && this.movesRemaining === 1) {
+      this.halfMovePhase   = true;
+      this.halfMovePending = false;
+    }
+
+    const msgs = [];
     if (info.maneuverDC > 0) {
-      const label = info.absDiff === 1
-        ? (this.maneuverMode === 'drift' ? 'Drift'       : 'Bend 45\xB0')
-        : (this.maneuverMode === 'drift' ? 'Steep Drift' : 'Bend 90\xB0');
+      const label = info.isSwerve
+        ? (info.maneuverDC === 4 ? 'Swerve 45\xB0' : 'Swerve 90\xB0')
+        : info.isDrift
+          ? (info.maneuverDC === 1 ? 'Drift' : 'Steep Drift')
+          : (info.maneuverDC === 3 ? 'Bend 45\xB0' : 'Bend 90\xB0');
       car.maneuverUsedThisPhase = true;
-      applyManeuver(car, info.maneuverDC, msgs);
+      applyManeuver(car, info.maneuverDC, msgs, origFacing);
+      this._checkDestroyed(msgs);
       msgs.unshift(car.name + ' \u2192 (' + col + ',' + row + ') Ph' + this.movePhase +
                    ' [' + label + ' D' + info.maneuverDC + '] facing ' + FACING_NAMES[car.facing]);
+    } else if (wasHalf) {
+      msgs.push(car.name + ' \u2192 (' + col + ',' + row + ') Ph' + this.movePhase +
+                ' [\xBD" straight] facing ' + FACING_NAMES[car.facing]);
     } else {
       msgs.push(car.name + ' \u2192 (' + col + ',' + row + ') Ph' + this.movePhase +
                 ' facing ' + FACING_NAMES[car.facing]);
@@ -522,6 +782,73 @@ class GameState {
     return this._advanceMover();
   }
 
+  // Apply any pending crash effects for the active car at the start of its move.
+  // Returns log messages. Sets movesRemaining=0 when the car's movement is consumed.
+  _applyCrashEffects() {
+    const car  = this.activeCar;
+    const msgs = [];
+
+    if (car.spinout) {
+      const { dir, rotDir } = car.spinout;
+      car.facing = (car.facing + rotDir + 8) % 8;
+      const [fdx, fdy] = FACING_VEC[dir];
+      car.x = Math.max(0, Math.min(GRID_COLS - 1, car.x + 4 * fdx));
+      car.y = Math.max(0, Math.min(GRID_ROWS - 1, car.y + 4 * fdy));
+      msgs.push(car.name + ' SPINOUT \u2014 facing \u2192 ' + FACING_NAMES[car.facing] +
+                ', slides 1" \u2192 (' + car.x + ',' + car.y + ')');
+      this.movesRemaining = 0;
+      this._checkDestroyed(msgs);
+      return msgs;
+    }
+
+    if (car.crashPending) {
+      const { type, dir } = car.crashPending;
+      car.crashPending = null;
+      const [fdx, fdy]  = FACING_VEC[dir];
+      const [cfx, cfy]  = FACING_VEC[car.facing];
+      const sizeLabel   = { trivial: '\u00bc"', minor: '\u00bd"', moderate: '\u00be"', severe: '1"' };
+      let skidSq = 0, afterSq = 0;
+
+      if (type === 'trivial')  { skidSq = 1; afterSq = 3; }
+      else if (type === 'minor')    { skidSq = 2; afterSq = 2;
+        car.speed = Math.max(0, car.speed - 5);
+        msgs.push(car.name + ' minor skid \u2014 speed \u22125 mph \u2192 ' + car.speed + ' mph');
+      } else if (type === 'moderate') { skidSq = 3; afterSq = 1;
+        car.crashPending = { type: 'trivial', dir };  // trivial skid next phase
+      } else if (type === 'severe') { skidSq = 4; afterSq = 0;
+        car.crashPending = { type: 'minor', dir };    // minor skid next phase
+      }
+
+      car.x = Math.max(0, Math.min(GRID_COLS - 1, car.x + skidSq * fdx));
+      car.y = Math.max(0, Math.min(GRID_ROWS - 1, car.y + skidSq * fdy));
+      msgs.push(car.name + ' ' + type + ' skid ' + sizeLabel[type] + ' \u2192 (' + car.x + ',' + car.y + ')');
+
+      if (afterSq > 0) {
+        car.x = Math.max(0, Math.min(GRID_COLS - 1, car.x + afterSq * cfx));
+        car.y = Math.max(0, Math.min(GRID_ROWS - 1, car.y + afterSq * cfy));
+        const afterLabel = afterSq === 1 ? '\u00bc"' : afterSq === 2 ? '\u00bd"' : '\u00be"';
+        msgs.push(car.name + ' forced ' + afterLabel + ' straight \u2192 (' + car.x + ',' + car.y + ')');
+      }
+
+      this.movesRemaining = 0;
+      this._checkDestroyed(msgs);
+      return msgs;
+    }
+
+    return msgs;
+  }
+
+  _checkDestroyed(msgs) {
+    for (let i = 0; i < this.cars.length; i++) {
+      if (this.cars[i].isDestroyed() && !this.gameOver) {
+        this.gameOver = true;
+        this.winner   = this.cars[1 - i];
+        msgs.push('\u2605 ' + this.winner.name + ' WINS!');
+        return;
+      }
+    }
+  }
+
   // ── Special maneuvers ───────────────────────────────────────────
 
   canBootlegger() {
@@ -529,14 +856,18 @@ class GameState {
     return this.phase === PHASE.MOVE &&
            this.movesRemaining > 0 &&
            !car.maneuverUsedThisPhase &&
-           car.speed >= 2 && car.speed <= 3;
+           !this.halfMovePhase &&
+           car.speed >= 15 && car.speed <= 25;
   }
 
   doBootlegger() {
-    const car  = this.activeCar;
+    this.selectedManeuver = null;
+    const car        = this.activeCar;
+    const preFacing  = car.facing;
     const msgs = [car.name + ' \u2014 BOOTLEGGER!'];
     car.maneuverUsedThisPhase = true;
-    applyManeuver(car, 7, msgs);
+    applyManeuver(car, 7, msgs, preFacing);
+    this._checkDestroyed(msgs);
     if (!car.isDestroyed()) {
       car.facing = (car.facing + 4) % 8;
       car.speed  = 0;
@@ -566,11 +897,13 @@ class GameState {
     if (weapon.shotsThisTurn >= weapon.rof)
                                         return { hit: false, messages: [weapon.name + ' ROF limit reached'] };
 
+    if (attacker.fireModifier >= 999)    return { hit: false, messages: ['No aimed fire this turn (***)'] };
+
     const arcCheck = checkFireArc(attacker, target, weapon);
     if (!arcCheck.canFire)              return { hit: false, messages: [arcCheck.reason] };
 
     const dist    = arcCheck.dist;
-    const toHit   = calcToHit(target, dist);
+    const toHit   = calcToHit(target, dist, attacker.fireModifier);
     const diceRes = rollDice(2, 6);
     const hit     = diceRes.total >= toHit;
 
@@ -615,6 +948,11 @@ class GameState {
 
   _endTurnFinal() {
     for (const car of this.cars) {
+      if (car.spinout) {
+        car.speed = Math.max(0, car.speed - 20);
+        if (car.speed === 0) car.spinout = null;
+      }
+      car.fireModifier   = 0;
       car.handlingStatus = Math.min(car.hc, car.handlingStatus + car.hc);
     }
     this.turn++;
@@ -675,28 +1013,61 @@ class Grid {
   }
 
   _moveMoves() {
-    const ctx    = this.ctx;
-    const car    = this.gs.activeCar;
-    // DC → [fillRGBA, strokeRGBA]
+    const ctx = this.ctx;
+    const gs  = this.gs;
+    const sel = gs.selectedManeuver;
+    const car = gs.activeCar;
+    const f   = car.facing;
+    const [fdx, fdy] = FACING_VEC[f];
+    const rx = -fdy, ry =  fdx;
+    const lx =  fdy, ly = -fdx;
     const colors = {
-      0: ['rgba(0,200,255,0.12)',  'rgba(0,200,255,0.38)'],   // straight — faint cyan
-      1: ['rgba(0,230,120,0.18)',  'rgba(0,230,120,0.55)'],   // D1 drift  — green
-      3: ['rgba(0,140,255,0.18)',  'rgba(0,140,255,0.55)'],   // D3 bend/steep drift — blue
-      6: ['rgba(255,140,0,0.18)',  'rgba(255,140,0,0.55)'],   // D6 bend 90° — orange
+      0: ['rgba(0,200,255,0.12)', 'rgba(0,200,255,0.38)'],
+      1: ['rgba(0,230,120,0.18)', 'rgba(0,230,120,0.55)'],
+      3: ['rgba(0,140,255,0.18)', 'rgba(0,140,255,0.55)'],
+      4: ['rgba(180,0,255,0.18)', 'rgba(180,0,255,0.60)'],
+      6: ['rgba(255,140,0,0.18)', 'rgba(255,140,0,0.55)'],
+      7: ['rgba(255,50,50,0.18)', 'rgba(255,50,50,0.60)'],
     };
-    for (let dc = -1; dc <= 1; dc++) {
-      for (let dr = -1; dr <= 1; dr++) {
-        if (!dc && !dr) continue;
-        const nx = car.x + dc, ny = car.y + dr;
-        const info = this.gs.getMoveInfo(nx, ny);
-        if (!info) continue;
-        const [fill, stroke] = colors[info.maneuverDC] || colors[0];
-        ctx.fillStyle   = fill;
-        ctx.fillRect(nx*SQ, ny*SQ, SQ, SQ);
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth   = 1;
-        ctx.strokeRect(nx*SQ+0.5, ny*SQ+0.5, SQ-1, SQ-1);
-      }
+
+    let dests;
+    if (sel && sel !== 'bootlegger') {
+      // Show only the selected maneuver's destination
+      const d = destForManeuver(sel, car, gs.halfMovePhase);
+      dests = d ? [{ nx: d[0], ny: d[1] }] : [];
+    } else {
+      dests = gs.halfMovePhase ? [
+        { nx: car.x + 2*fdx, ny: car.y + 2*fdy },
+      ] : [
+        { nx: car.x + 4*fdx,                               ny: car.y + 4*fdy                               },
+        { nx: car.x + 4*fdx + lx,                          ny: car.y + 4*fdy + ly                          },
+        { nx: car.x + 4*fdx + rx,                          ny: car.y + 4*fdy + ry                          },
+        { nx: car.x + 4*fdx + 2*lx,                        ny: car.y + 4*fdy + 2*ly                        },
+        { nx: car.x + 4*fdx + 2*rx,                        ny: car.y + 4*fdy + 2*ry                        },
+        { nx: car.x + 4*FACING_VEC[(f-1+8)%8][0],         ny: car.y + 4*FACING_VEC[(f-1+8)%8][1]          },
+        { nx: car.x + 4*FACING_VEC[(f+1)%8][0],           ny: car.y + 4*FACING_VEC[(f+1)%8][1]            },
+        { nx: car.x + 4*FACING_VEC[(f-2+8)%8][0],         ny: car.y + 4*FACING_VEC[(f-2+8)%8][1]          },
+        { nx: car.x + 4*FACING_VEC[(f+2)%8][0],           ny: car.y + 4*FACING_VEC[(f+2)%8][1]            },
+        { nx: car.x + rx + 4*FACING_VEC[(f-1+8)%8][0],    ny: car.y + ry + 4*FACING_VEC[(f-1+8)%8][1]     },
+        { nx: car.x + lx + 4*FACING_VEC[(f+1)%8][0],      ny: car.y + ly + 4*FACING_VEC[(f+1)%8][1]       },
+        { nx: car.x + rx + 4*FACING_VEC[(f-2+8)%8][0],    ny: car.y + ry + 4*FACING_VEC[(f-2+8)%8][1]     },
+        { nx: car.x + lx + 4*FACING_VEC[(f+2)%8][0],      ny: car.y + ly + 4*FACING_VEC[(f+2)%8][1]       },
+      ];
+    }
+
+    const seen = new Set();
+    for (const { nx, ny } of dests) {
+      const key = nx + ',' + ny;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const info = gs.getMoveInfo(nx, ny);
+      if (!info) continue;
+      const [fill, stroke] = colors[info.maneuverDC] || colors[0];
+      ctx.fillStyle   = fill;
+      ctx.fillRect(nx*SQ, ny*SQ, SQ, SQ);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth   = 1;
+      ctx.strokeRect(nx*SQ+0.5, ny*SQ+0.5, SQ-1, SQ-1);
     }
   }
 
@@ -722,24 +1093,23 @@ class Grid {
     ctx.restore();
 
     if (canFire) {
-      const er = rearSquare(enemy);
-      ctx.fillStyle   = 'rgba(255,180,0,0.15)';
-      ctx.fillRect(enemy.x*SQ, enemy.y*SQ, SQ, SQ);
-      ctx.fillRect(er.x*SQ, er.y*SQ, SQ, SQ);
-      ctx.strokeStyle = 'rgba(255,180,0,0.75)';
-      ctx.lineWidth   = 2;
-      ctx.strokeRect(enemy.x*SQ+1, enemy.y*SQ+1, SQ-2, SQ-2);
-      ctx.strokeRect(er.x*SQ+1, er.y*SQ+1, SQ-2, SQ-2);
+      for (const sq of carSquares(enemy)) {
+        ctx.fillStyle = 'rgba(255,180,0,0.15)';
+        ctx.fillRect(sq.x*SQ, sq.y*SQ, SQ, SQ);
+        ctx.strokeStyle = 'rgba(255,180,0,0.75)';
+        ctx.lineWidth   = 2;
+        ctx.strokeRect(sq.x*SQ+1, sq.y*SQ+1, SQ-2, SQ-2);
+      }
     }
   }
 
   _activeOutline() {
-    const car  = this.gs.activeCar;
-    const rear = rearSquare(car);
-    this.ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    const car = this.gs.activeCar;
+    this.ctx.strokeStyle = 'rgba(255,255,255,0.45)';
     this.ctx.lineWidth   = 1.5;
-    this.ctx.strokeRect(car.x*SQ+1,  car.y*SQ+1,  SQ-2, SQ-2);
-    this.ctx.strokeRect(rear.x*SQ+1, rear.y*SQ+1, SQ-2, SQ-2);
+    for (const sq of carSquares(car)) {
+      this.ctx.strokeRect(sq.x*SQ+1, sq.y*SQ+1, SQ-2, SQ-2);
+    }
   }
 
   _cars() {
@@ -747,20 +1117,17 @@ class Grid {
   }
 
   _drawCar(car) {
-    const ctx  = this.ctx;
-    const rear = rearSquare(car);
+    const ctx = this.ctx;
     const [fdx, fdy] = FACING_VEC[car.facing];
+    const rx = -fdy, ry = fdx;   // right perp
 
-    // Centers of front and rear squares
-    const fCx = (car.x  + 0.5) * SQ, fCy = (car.y  + 0.5) * SQ;
-    const rCx = (rear.x + 0.5) * SQ, rCy = (rear.y + 0.5) * SQ;
-    const midX  = (fCx + rCx) / 2, midY = (fCy + rCy) / 2;
-    const dist  = Math.sqrt((fCx - rCx) ** 2 + (fCy - rCy) ** 2);
-    const angle = Math.atan2(fdy, fdx);
-
-    // Counter body: extends 0.38 cell past each center point, 0.68 cell wide
-    const halfLen = dist / 2 + SQ * 0.38;
-    const halfW   = SQ * 0.34;
+    // Visual center of 2×4 body:
+    //   1.5 squares back along axis from front-left, 0.5 squares right
+    const midX = (car.x - 1.5*fdx + 0.5*rx + 0.5) * SQ;
+    const midY = (car.y - 1.5*fdy + 0.5*ry + 0.5) * SQ;
+    const angle   = Math.atan2(fdy, fdx);
+    const halfLen = 2 * SQ;   // half of 4-square length
+    const halfW   = SQ;       // half of 2-square width
 
     ctx.save();
     ctx.translate(midX, midY);
@@ -782,7 +1149,7 @@ class Grid {
     ctx.fillStyle = car.color;
     ctx.fillRect(-halfLen, -halfW, halfLen * 2, halfW * 2);
 
-    // Divider between front and rear halves
+    // Divider at midpoint (front half / rear half)
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth   = 1;
     ctx.beginPath();
@@ -808,7 +1175,7 @@ class Grid {
 
     // Car ID in rear half
     ctx.fillStyle    = 'rgba(0,0,0,0.8)';
-    ctx.font         = 'bold ' + Math.max(7, Math.round(SQ * 0.38)) + 'px monospace';
+    ctx.font         = 'bold ' + Math.max(8, Math.round(SQ * 0.55)) + 'px monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(car.id, -halfLen * 0.52, 0);
@@ -830,6 +1197,21 @@ class Grid {
 // ═══════════════════════════════════════════════════════════════
 // UI (DOM sidebar)
 // ═══════════════════════════════════════════════════════════════
+
+// Returns a human-readable safe speed range string for the given car state.
+function _safeRangeStr(car) {
+  const revMax = Math.floor(car.maxSpeed / 5);
+  const s = (v) => (v < 0 ? '\u2212' + (-v) : String(v));
+  if (car.speed === 0) {
+    return s(-Math.min(revMax, car.accel)) + '\u2013' + s(Math.min(car.maxSpeed, car.accel)) + ' mph';
+  } else if (car.reverse) {
+    const hi = Math.min(revMax, car.speed + car.accel);
+    const lo = Math.max(0, car.speed - car.accel);
+    return s(-hi) + '\u2013' + s(-lo) + ' mph';
+  } else {
+    return s(Math.max(0, car.speed - car.accel)) + '\u2013' + s(Math.min(car.maxSpeed, car.speed + car.accel)) + ' mph';
+  }
+}
 
 class UI {
   constructor(gs) {
@@ -856,11 +1238,12 @@ class UI {
     }
     const dr = document.getElementById('c'+n+'-driver');
     if (dr) {
-      if (!car.alive || car.driverHits >= 2) { dr.textContent='DEAD';    dr.style.color='#e74c3c'; }
+      if (car.driverHits >= 2)               { dr.textContent='DEAD';    dr.style.color='#e74c3c'; }
+      else if (!car.alive)                   { dr.textContent='OK';      dr.style.color='#aaa'; }
       else if (car.driverHits===1)           { dr.textContent='WOUNDED'; dr.style.color='#f39c12'; }
       else                                   { dr.textContent='OK';      dr.style.color='#2ecc71'; }
     }
-    setText('c'+n+'-speed-cur', car.speed);
+    setText('c'+n+'-speed-cur', (car.reverse ? '\u2212' : '') + car.speed);
     setText('c'+n+'-speed-max', car.maxSpeed);
     setText('c'+n+'-hc', car.hc);
     const hsEl = document.getElementById('c'+n+'-hs');
@@ -917,18 +1300,24 @@ class UI {
     showEl('fire-controls',  gs.phase === PHASE.FIRE);
     const car = gs.activeCar;
     setText('speed-max-hint',   car.maxSpeed);
-    setText('speed-range-hint', Math.max(0, car.speed - car.accel) + '\u2013' + Math.min(car.maxSpeed, car.speed + car.accel));
+    setText('speed-rev-hint',   Math.floor(car.maxSpeed / 5));
+    setText('speed-range-hint', _safeRangeStr(car));
     // Move-controls
     if (gs.phase === PHASE.MOVE) {
       const el = document.getElementById('move-phase-info');
       if (el) el.textContent = 'Phase ' + gs.movePhase + ' of 5  \u2014  ' + gs.activeCar.name;
-      const used     = gs.activeCar.maneuverUsedThisPhase;
-      const bendBtn  = document.getElementById('mode-bend');
-      const driftBtn = document.getElementById('mode-drift');
-      const bootBtn  = document.getElementById('do-bootlegger');
-      if (bendBtn)  { bendBtn.classList.toggle('active', gs.maneuverMode === 'bend');  bendBtn.disabled  = used; }
-      if (driftBtn) { driftBtn.classList.toggle('active', gs.maneuverMode === 'drift'); driftBtn.disabled = used; }
-      if (bootBtn)  showEl('do-bootlegger', gs.canBootlegger());
+      const hasMoves = gs.movesRemaining > 0;
+      showEl('maneuver-menu', hasMoves);
+      if (hasMoves) this._updateManeuverMenu();
+      // Bootlegger confirm — only when bootlegger is the selected maneuver
+      showEl('do-bootlegger', gs.selectedManeuver === 'bootlegger');
+      // End Move only when genuinely blocked
+      const endMoveBtn = document.getElementById('end-move');
+      if (endMoveBtn) {
+        const stuck = gs.movesRemaining > 0 && !gs.hasValidMoves();
+        showEl('end-move', stuck);
+        if (stuck) endMoveBtn.textContent = 'Blocked \u2014 Skip Move';
+      }
     }
     // Fire-controls end button label
     const endBtn = document.getElementById('end-turn');
@@ -940,6 +1329,25 @@ class UI {
     ['set-speed', 'end-move', 'end-turn'].forEach(id => {
       const b = document.getElementById(id);
       if (b) b.classList.toggle('p2', isP2);
+    });
+  }
+
+  _updateManeuverMenu() {
+    const gs  = this.gs;
+    const car = gs.activeCar;
+    const menu = document.getElementById('maneuver-menu');
+    if (!menu) return;
+    menu.querySelectorAll('[data-man]').forEach(btn => {
+      const key = btn.dataset.man;
+      let enabled;
+      if (key === 'bootlegger') {
+        enabled = gs.canBootlegger();
+      } else {
+        const d = destForManeuver(key, car, gs.halfMovePhase);
+        enabled = d !== null && gs.getMoveInfo(d[0], d[1]) !== null;
+      }
+      btn.disabled = !enabled;
+      btn.classList.toggle('selected', gs.selectedManeuver === key);
     });
   }
 
@@ -1011,14 +1419,25 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
   }
 
   function syncSpeed() {
-    setText('speed-select-val', selectedSpeed);
-    const car = gs.activeCar;
-    const safeMin = Math.max(0, car.speed - car.accel);
-    const safeMax = Math.min(car.maxSpeed, car.speed + car.accel);
-    setText('speed-range-hint', safeMin + '–' + safeMax);
+    const car        = gs.activeCar;
+    const wantRev    = selectedSpeed < 0;
+    const wantMag    = Math.abs(selectedSpeed);
+    const sign       = selectedSpeed < 0 ? '\u2212' : '';
+    setText('speed-select-val', sign + wantMag + ' mph');
+    setText('speed-range-hint', _safeRangeStr(car));
     const el = document.getElementById('speed-select-val');
     if (el) {
-      el.style.color = selectedSpeed < safeMin ? '#e74c3c' : selectedSpeed > safeMax ? '#f39c12' : '';
+      // Red if direction switch while moving; red if emergency decel; orange if over accel cap
+      const dirSwitch = wantRev !== car.reverse && car.speed > 0;
+      const revMax    = Math.floor(car.maxSpeed / 5);
+      const maxMag    = wantRev ? revMax : car.maxSpeed;
+      const maxSafe   = Math.min(maxMag, car.speed + car.accel);
+      const minSafe   = Math.max(0, car.speed - car.accel);
+      let color = '';
+      if (dirSwitch)         color = '#e74c3c';
+      else if (wantMag > maxSafe) color = '#f39c12';
+      else if (!wantRev && wantMag < minSafe) color = '#e74c3c';
+      el.style.color = color;
     }
   }
 
@@ -1028,17 +1447,21 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
     const { col, row } = grid.screenToGrid(e.clientX, e.clientY);
 
     if (gs.phase === PHASE.MOVE) {
-      if (gs.canMoveTo(col, row)) {
-        ui.log(gs.moveActiveCar(col, row));
-        render();
+      const sel = gs.selectedManeuver;
+      if (sel && sel !== 'bootlegger' && sel !== 'straight') {
+        const d = destForManeuver(sel, gs.activeCar, gs.halfMovePhase);
+        if (d && d[0] === col && d[1] === row && gs.canMoveTo(col, row)) {
+          ui.log(gs.moveActiveCar(col, row));
+          if (gs.gameOver) ui.showGameOver(gs.winner);
+          render();
+        }
       }
       return;
     }
 
     if (gs.phase === PHASE.FIRE) {
       const enemy = gs.enemyCar;
-      const er    = rearSquare(enemy);
-      const hitEnemy = (col === enemy.x && row === enemy.y) || (col === er.x && row === er.y);
+      const hitEnemy = carSquares(enemy).some(sq => sq.x === col && sq.y === row);
       if (!hitEnemy) return;
       let fired = false;
       for (let i = 0; i < gs.activeCar.weapons.length; i++) {
@@ -1058,19 +1481,27 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
 
   // ── Speed controls ──────────────────────────────────────────
   document.getElementById('speed-down').addEventListener('click', function() {
-    selectedSpeed = Math.max(0, selectedSpeed - 1);
+    const car    = gs.activeCar;
+    const revMax = Math.floor(car.maxSpeed / 5);
+    // Can only go into negative (reverse) territory if currently stopped
+    const minAllowed = (!car.reverse && car.speed > 0) ? 0 : -revMax;
+    selectedSpeed = Math.max(minAllowed, selectedSpeed - 5);
     syncSpeed();
   });
   document.getElementById('speed-up').addEventListener('click', function() {
-    const maxThisTurn = Math.min(gs.activeCar.maxSpeed, gs.activeCar.speed + gs.activeCar.accel);
-    selectedSpeed = Math.min(maxThisTurn, selectedSpeed + 1);
+    const car        = gs.activeCar;
+    const maxFwd     = Math.min(car.maxSpeed, car.speed + car.accel);
+    // Can only go into positive (forward) territory if currently stopped
+    const maxAllowed = (car.reverse && car.speed > 0) ? 0 : maxFwd;
+    selectedSpeed = Math.min(maxAllowed, selectedSpeed + 5);
     syncSpeed();
   });
   document.getElementById('set-speed').addEventListener('click', function() {
     ui.log(gs.setSpeed(selectedSpeed));
-    // If still in SPEED phase, P2 is now declaring — reset selector to P2's speed
     if (gs.phase === PHASE.SPEED) {
-      selectedSpeed = gs.activeCar.speed;
+      // P2 now declaring — init selector to P2's current signed speed
+      const c = gs.activeCar;
+      selectedSpeed = c.reverse ? -c.speed : c.speed;
       syncSpeed();
     }
     render();
@@ -1078,20 +1509,31 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
 
   // ── Move controls ───────────────────────────────────────────
   document.getElementById('end-move').addEventListener('click', function() {
+    gs.selectedManeuver = null;
     ui.log(gs.endMove());
-    render();
-  });
-  document.getElementById('mode-bend').addEventListener('click', function() {
-    gs.maneuverMode = 'bend';
-    render();
-  });
-  document.getElementById('mode-drift').addEventListener('click', function() {
-    gs.maneuverMode = 'drift';
     render();
   });
   document.getElementById('do-bootlegger').addEventListener('click', function() {
     ui.log(gs.doBootlegger());
+    if (gs.gameOver) ui.showGameOver(gs.winner);
     render();
+  });
+  document.getElementById('maneuver-menu').addEventListener('click', function(e) {
+    if (gs.phase !== PHASE.MOVE || gs.movesRemaining <= 0) return;
+    const btn = e.target.closest('[data-man]');
+    if (!btn || btn.disabled) return;
+    const key = btn.dataset.man;
+    if (key === 'bootlegger') {
+      gs.selectedManeuver = (gs.selectedManeuver === 'bootlegger') ? null : 'bootlegger';
+      render();
+      return;
+    }
+    const d = destForManeuver(key, gs.activeCar, gs.halfMovePhase);
+    if (d && gs.canMoveTo(d[0], d[1])) {
+      ui.log(gs.moveActiveCar(d[0], d[1]));
+      if (gs.gameOver) ui.showGameOver(gs.winner);
+      render();
+    }
   });
 
   // ── Fire / End Turn ─────────────────────────────────────────
@@ -1101,8 +1543,8 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
     const msgs = gs.endFire();
     ui.log(msgs);
     if (gs.phase === PHASE.SPEED) {
-      // New turn started — reset speed selector for P1
-      selectedSpeed = gs.activeCar.speed;
+      const c = gs.activeCar;
+      selectedSpeed = c.reverse ? -c.speed : c.speed;
       syncSpeed();
       ui.log('--- Turn ' + gs.turn + ': P1 & P2 set speeds ---');
     }
@@ -1146,34 +1588,65 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         const car = gs.activeCar;
-        const nx = car.x + FACING_VEC[car.facing][0];
-        const ny = car.y + FACING_VEC[car.facing][1];
-        if (gs.canMoveTo(nx, ny)) { ui.log(gs.moveActiveCar(nx, ny)); render(); }
+        const [fdx, fdy] = FACING_VEC[car.facing];
+        const step = gs.halfMovePhase ? 2 : 4;
+        const nx = car.x + step*fdx;
+        const ny = car.y + step*fdy;
+        if (gs.canMoveTo(nx, ny)) {
+          gs.selectedManeuver = null;
+          ui.log(gs.moveActiveCar(nx, ny));
+          if (gs.gameOver) ui.showGameOver(gs.winner);
+          render();
+        }
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
+        if (gs.halfMovePhase) return;
         const car = gs.activeCar;
-        const savedMode = gs.maneuverMode;
-        gs.maneuverMode = e.shiftKey ? 'drift' : 'bend';
-        const dir = e.key === 'ArrowLeft' ? -1 : 1;
-        const turnFacing = (car.facing + dir + 8) % 8;
-        const fv = FACING_VEC[turnFacing];
-        const nx = car.x + fv[0];
-        const ny = car.y + fv[1];
-        if (gs.canMoveTo(nx, ny)) { ui.log(gs.moveActiveCar(nx, ny)); render(); }
-        else gs.maneuverMode = savedMode;
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        ui.log(gs.endMove());
-        render();
+        const [fdx, fdy] = FACING_VEC[car.facing];
+        const lx = fdy, ly = -fdx;
+        const rx2 = -fdy, ry2 = fdx;
+        let nx, ny;
+        if (e.shiftKey) {
+          if (e.key === 'ArrowLeft') { nx = car.x + 4*fdx + lx; ny = car.y + 4*fdy + ly; }
+          else                       { nx = car.x + 4*fdx + rx2; ny = car.y + 4*fdy + ry2; }
+        } else {
+          const dir = e.key === 'ArrowLeft' ? -1 : 1;
+          const turnFacing = (car.facing + dir + 8) % 8;
+          const [bx, by] = FACING_VEC[turnFacing];
+          nx = car.x + 4*bx;
+          ny = car.y + 4*by;
+        }
+        if (gs.canMoveTo(nx, ny)) {
+          gs.selectedManeuver = null;
+          ui.log(gs.moveActiveCar(nx, ny));
+          if (gs.gameOver) ui.showGameOver(gs.winner);
+          render();
+        }
       }
     }
 
     if (gs.phase === PHASE.SPEED) {
-      if (e.key === '+' || e.key === '=') { selectedSpeed = Math.min(gs.activeCar.maxSpeed, selectedSpeed+1); syncSpeed(); }
-      if (e.key === '-')                  { selectedSpeed = Math.max(0, selectedSpeed-1); syncSpeed(); }
+      if (e.key === '+' || e.key === '=') {
+        const car = gs.activeCar;
+        const maxFwd = Math.min(car.maxSpeed, car.speed + car.accel);
+        const maxAllowed = (car.reverse && car.speed > 0) ? 0 : maxFwd;
+        selectedSpeed = Math.min(maxAllowed, selectedSpeed + 5);
+        syncSpeed();
+      }
+      if (e.key === '-') {
+        const car = gs.activeCar;
+        const revMax = Math.floor(car.maxSpeed / 5);
+        const minAllowed = (!car.reverse && car.speed > 0) ? 0 : -revMax;
+        selectedSpeed = Math.max(minAllowed, selectedSpeed - 5);
+        syncSpeed();
+      }
       if (e.key === 'Enter') {
         ui.log(gs.setSpeed(selectedSpeed));
-        if (gs.phase === PHASE.SPEED) { selectedSpeed = gs.activeCar.speed; syncSpeed(); }
+        if (gs.phase === PHASE.SPEED) {
+          const c = gs.activeCar;
+          selectedSpeed = c.reverse ? -c.speed : c.speed;
+          syncSpeed();
+        }
         render();
       }
     }
@@ -1185,9 +1658,9 @@ function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,
   });
 
   // ── Boot ────────────────────────────────────────────────────
-  ui.log('Car Wars v0.3 — phase movement + 1\xD72 footprint');
+  ui.log('Car Wars v0.5 \u2014 2\xD74 counter, mph speed, 2-sq moves');
   ui.log('P1: Killer Kart (red) \u2014 Machine Gun');
-  ui.log('P2: Road Warrior (blue) \u2014 Rocket');
-  ui.log('Set speed and press GO!');
+  ui.log('P2: Killer Kart (blue) \u2014 Machine Gun');
+  ui.log('Set speed (0\u201375 mph) and press GO!');
   render();
 })();

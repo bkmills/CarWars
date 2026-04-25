@@ -118,11 +118,11 @@
 
       <!-- SPEED phase -->
       <div id="speed-controls">
-        <div class="ctrl-label">Set speed (0–<span id="speed-max-hint">15</span>)</div>
-        <div class="hint">Safe range: <span id="speed-range-hint">0–3</span></div>
+        <div class="ctrl-label">Set speed (&minus;<span id="speed-rev-hint">15</span>–<span id="speed-max-hint">75</span> mph)</div>
+        <div class="hint">Safe range: <span id="speed-range-hint">0–15 mph</span></div>
         <div class="speed-row">
           <button id="speed-down" class="speed-btn">&#8722;</button>
-          <span id="speed-select-val">0</span>
+          <span id="speed-select-val">0 mph</span>
           <button id="speed-up"   class="speed-btn">&#43;</button>
         </div>
         <button id="set-speed" class="btn-primary">GO &#x2192;</button>
@@ -133,13 +133,40 @@
       <div id="move-controls" style="display:none">
         <div id="move-phase-info" class="ctrl-label">Phase 1 of 5</div>
         <div class="moves-disp">Moves left: <strong id="moves-left">0</strong></div>
-        <div id="maneuver-btns">
-          <button id="mode-bend"  class="mode-btn active">Bend</button>
-          <button id="mode-drift" class="mode-btn">Drift</button>
+        <div id="maneuver-menu" style="display:none">
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="straight">Straight</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="drift-l">Drift L</button>
+            <button class="man-btn" data-man="drift-r">Drift R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="steep-l">Steep L</button>
+            <button class="man-btn" data-man="steep-r">Steep R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="bend45-l">Bend 45&#xB0; L</button>
+            <button class="man-btn" data-man="bend45-r">Bend 45&#xB0; R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="bend90-l">Bend 90&#xB0; L</button>
+            <button class="man-btn" data-man="bend90-r">Bend 90&#xB0; R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="swerve45-l">Swerve 45&#xB0; L</button>
+            <button class="man-btn" data-man="swerve45-r">Swerve 45&#xB0; R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn" data-man="swerve90-l">Swerve 90&#xB0; L</button>
+            <button class="man-btn" data-man="swerve90-r">Swerve 90&#xB0; R</button>
+          </div>
+          <div class="maneuver-row">
+            <button class="man-btn boot-btn" data-man="bootlegger">Bootlegger D7</button>
+          </div>
         </div>
-        <button id="do-bootlegger" class="mode-btn boot-btn" style="display:none">Bootlegger D7</button>
-        <button id="end-move" class="btn-primary" style="margin-top:6px">End Move</button>
-        <div class="hint">&#9632;=straight &nbsp;&#9632;=D1 &nbsp;&#9632;=D3 &nbsp;&#9632;=D6</div>
+        <button id="do-bootlegger" class="mode-btn boot-btn" style="display:none;margin-top:4px">Execute Bootlegger</button>
+        <button id="end-move" class="btn-primary" style="display:none;margin-top:6px">Blocked &#x2014; Skip Move</button>
       </div>
 
       <!-- FIRE phase -->

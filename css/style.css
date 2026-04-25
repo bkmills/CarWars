@@ -275,11 +275,6 @@ html, body {
 .btn-secondary:hover { color: #ccc; border-color: #5a5a8e; }
 
 /* Maneuver mode buttons */
-#maneuver-btns {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
 .mode-btn {
   flex: 1;
   padding: 4px 6px;
@@ -293,10 +288,35 @@ html, body {
   letter-spacing: 0.5px;
 }
 .mode-btn:hover:not(:disabled) { color: #ccc; border-color: #5a5a9a; }
-.mode-btn.active  { border-color: #5bc4ef; color: #5bc4ef; background: #141e2a; }
 .mode-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .boot-btn { width: 100%; border-color: #f39c12; color: #f39c12; margin-bottom: 4px; }
-.boot-btn:hover { background: #1e160a; }
+.boot-btn:hover:not(:disabled) { background: #1e160a; }
+
+/* Maneuver selection menu */
+#maneuver-menu { margin-bottom: 4px; }
+.maneuver-row {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+.man-btn {
+  flex: 1;
+  padding: 5px 3px;
+  background: #1e1e3a;
+  border: 1px solid #3a3a6a;
+  color: #aaa;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.man-btn:hover:not(:disabled) { border-color: #5a5a9a; color: #fff; }
+.man-btn.selected { border-color: #5bc4ef; color: #5bc4ef; background: #141e2a; }
+.man-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.man-btn.boot-btn { color: #f39c12; border-color: #f39c12; }
+.man-btn.boot-btn:hover:not(:disabled) { background: #1e160a; }
+.man-btn.boot-btn.selected { background: #1e160a; }
 
 /* Moves display */
 .moves-disp {
