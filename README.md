@@ -58,20 +58,30 @@ Each turn has three phases:
 
 ### Maneuvers
 Select a maneuver from the sidebar panel — it executes immediately (no second click needed).
-Each maneuver has a Difficulty Class (DC) that drains Handling Status (HS):
+Each maneuver has a Difficulty Class (DC) that drains Handling Status (HS).
+The **bend angle selector** (15°–90° in 15° steps) applies to Bend, Swerve, and Pivot.
 
 | Maneuver | DC | Description |
 |----------|----|-------------|
 | Straight | D0 | No facing change |
 | Drift L/R | D1 | Lateral slide, facing unchanged |
-| Steep Drift L/R | D3 | Larger lateral slide |
-| Bend 45° L/R | D3 | One 45° facing step |
-| Bend 90° L/R | D6 | Two 45° steps |
-| Swerve 45° L/R | D4 | Lateral offset + 45° bend |
-| Swerve 90° L/R | D7 | Lateral offset + 90° bend |
+| Steep Drift L/R | D3 | Larger lateral slide (2 sq) |
+| Bend L/R | D1–D6 | Facing change by selected angle (15°=D1 … 90°=D6) |
+| Swerve L/R | D2–D7 | 1 sq lateral offset + bend; DC = bend DC + 1 |
+| Pivot L/R | D0 | At exactly 5 mph: advance 1 sq, then rotate to selected angle |
 | Bootlegger | D7 | 180° reversal; only at 15–25 mph |
 
 All DCs are +1 in reverse. One maneuver allowed per phase per car.
+
+### Controlled Skid
+When executing a Bend or Swerve, optionally declare a **controlled skid** (¼"–1") via the Skid selector. The skid DC adds to the maneuver DC; if control is maintained the car carries extra momentum in the pre-maneuver direction on its next move.
+
+| Skid | +DC | Fire mod | Decel | Tire dmg |
+|------|-----|----------|-------|----------|
+| ¼"  | +1  | −1       | 0     | 0        |
+| ½"  | +2  | −3       | −5    | 0        |
+| ¾"  | +3  | −6       | −5    | −1       |
+| 1"  | +4  | no fire  | −10   | −2       |
 
 ### Reverse Driving
 - Max reverse speed = floor(topSpeed ÷ 5) mph
@@ -166,12 +176,12 @@ Key symbols in `game.js`:
 | `BUILDER_DATA` | Compendium tables: bodies, chassis, suspensions, engines, tires, MG |
 | `buildCarConfig()` | Computes car stats from builder selections |
 | `CarBuilder` | Modal UI: open/recalc/confirm flow for P1 then P2 |
-| `Car` | State: position, facing, speed, armor (6 facings), components, weapons, HS, crash state |
+| `Car` | State: position, facing (float degrees), speed, armor (6 facings), components, weapons, HS, crash state |
 | `GameState` | Turn loop, 5-phase movement, simultaneous order, combat |
-| `Grid` | Canvas rendering (cars, move highlights, fire lines) |
+| `Grid` | Canvas rendering (cars, ghost previews, fire lines) |
 | `UI` | Sidebar DOM updates, action log, maneuver menu |
 | `crashTable1()` | Crash Table 1 — skids, spinouts, rolls, vaults |
-| `destForManeuver()` | Geometry helper — computes destination for any maneuver key |
+| `dest*()`  | Geometry helpers — `destForBend`, `destForSwerve`, `destForPivot`, `destForDrift`, etc. |
 | `game.init()` | Initialises game with two built car configs |
 
 ---
@@ -184,8 +194,9 @@ Key symbols in `game.js`:
 **v0.4** ✅ — Full maneuver types, facing-relative keyboard, component damage system  
 **v0.5** ✅ — Sidebar maneuver panel, reverse driving, Crash Table 1 (skids/spinouts/rolls)  
 **v0.6** ✅ — Car builder (body/chassis/suspension/engine/tires/armor/weapon), 6-facing armor, variable component DP  
-**v0.7** 🔲 — Arena options (walls, debris, starting layouts)  
-**Future** 🔲 — Additional weapons, free movement, AI opponent, 3+ cars, mobile support  
+**v0.7** ✅ — Free movement (float-degree facing, OBB collision), Swerve, Pivot (5 mph), Controlled Skid, ghost car previews  
+**v0.8** 🔲 — Arena options (walls, debris, starting layouts)  
+**Future** 🔲 — Additional weapons, AI opponent, 3+ cars, mobile support  
 
 ---
 

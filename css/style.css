@@ -53,22 +53,12 @@ html, body {
   padding-bottom: 8px;
 }
 
-#header-title {
-  font-size: 22px;
-  font-weight: bold;
-  letter-spacing: 5px;
-  color: #e74c3c;
-  text-shadow: 0 0 12px rgba(231,76,60,.45);
-}
-
 #header-sub {
   font-size: 12px;
   color: #aaa;
   margin: 3px 0 5px;
 }
 
-#header-sub span#active-name   { color: #f0b429; }
-#header-sub span#phase-label   { color: #5bc4ef; }
 
 #header-btns {
   display: flex;
@@ -136,18 +126,42 @@ html, body {
 
 /* Armor grid — a mini top/left/right/back diagram */
 .armor-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 3px 6px;
+  align-items: center;
+  justify-items: center;
+  margin-bottom: 5px;
+}
+
+.armor-cell-center {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.armor-cell-side {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  justify-content: center;
+  width: 100%;
+}
+
+.tire-corner {
+  font-size: 10px;
+  font-weight: bold;
+  color: #2ecc71;
+  min-width: 28px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.tire-corner-stack {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  margin-bottom: 5px;
-}
-
-.armor-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
 }
 
 .af-label {
@@ -156,7 +170,6 @@ html, body {
   min-width: 26px;
   text-align: right;
 }
-.a-mid .af-label:last-child { text-align: left; }
 
 .armor-val {
   font-size: 17px;
@@ -181,13 +194,6 @@ html, body {
   font-size: 12px;
   color: #bbb;
   margin-top: 3px;
-}
-
-.tire-dot {
-  font-size: 10px;
-  color: #2ecc71;
-  margin: 0 1px;
-  cursor: default;
 }
 
 /* ── Phase controls ──────────────────────────────────────────────────────────── */
@@ -294,6 +300,27 @@ html, body {
 
 /* Maneuver selection menu */
 #maneuver-menu { margin-bottom: 4px; }
+
+/* Bend angle stepper */
+.bend-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+#bend-angle-label {
+  font-size: 20px;
+  font-weight: bold;
+  color: #5bc4ef;
+  min-width: 46px;
+  text-align: center;
+}
+#bend-dc-label {
+  font-size: 11px;
+  color: #888;
+  min-width: 24px;
+}
 .maneuver-row {
   display: flex;
   gap: 3px;
@@ -372,8 +399,8 @@ html, body {
   word-break: break-word;
   line-height: 1.4;
 }
-.log-line.p1 { border-left-color: rgba(231,76,60,0.55);  color: #e8b0a8; }
-.log-line.p2 { border-left-color: rgba(52,152,219,0.55); color: #a8c8e8; }
+.log-line.p1 { border-left-color: rgba(231,76,60,0.55);  color: #f07060; }
+.log-line.p2 { border-left-color: rgba(52,152,219,0.55); color: #5aaced; }
 .log-line.sys {
   border-left-color: #333;
   color: #888;

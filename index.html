@@ -20,7 +20,6 @@
 
     <!-- Header -->
     <div id="header">
-      <div id="header-title">CAR WARS</div>
       <div id="header-sub">
         <span id="turn-num-label">Turn</span>
         <span id="turn-num">1</span>
@@ -41,20 +40,39 @@
     <div class="car-panel" id="panel-1">
       <div class="car-header p1">— <span class="player-tag">P1</span></div>
       <div class="armor-grid">
-        <div class="armor-cell a-top">
+        <!-- row 1: front + FL/FR tires -->
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c1-tire-fl" title="FL">—</span>
+        </div>
+        <div class="armor-cell-center">
           <span class="af-label">Front</span>
           <span class="armor-val" id="c1-front">—</span>
         </div>
-        <div class="armor-cell a-mid">
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c1-tire-fr" title="FR">—</span>
+        </div>
+        <!-- row 2: left / car icon / right -->
+        <div class="armor-cell-side">
           <span class="af-label">L</span>
           <span class="armor-val" id="c1-left">—</span>
-          <span class="car-icon">&#9632;</span>
-          <span class="armor-val" id="c1-right">—</span>
-          <span class="af-label">R</span>
         </div>
-        <div class="armor-cell a-bot">
+        <span class="car-icon">&#9632;</span>
+        <div class="armor-cell-side" style="flex-direction:row-reverse">
+          <span class="af-label">R</span>
+          <span class="armor-val" id="c1-right">—</span>
+        </div>
+        <!-- row 3: back + RL/RR tires -->
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c1-tire-rl" title="RL">—</span>
+          <span class="tire-corner" id="c1-tire-rl2" title="RL2" style="display:none">—</span>
+        </div>
+        <div class="armor-cell-center">
           <span class="af-label">Back</span>
           <span class="armor-val" id="c1-back">—</span>
+        </div>
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c1-tire-rr" title="RR">—</span>
+          <span class="tire-corner" id="c1-tire-rr2" title="RR2" style="display:none">—</span>
         </div>
       </div>
       <div class="armor-tu">
@@ -64,8 +82,7 @@
       </div>
       <div class="stat-line">
         Driver: <span id="c1-driver" style="color:#2ecc71">—</span>
-        &nbsp;·&nbsp; HC: <span id="c1-hc">—</span>
-        &nbsp;·&nbsp; HS: <span id="c1-hs" style="color:#2ecc71">—</span>
+        &nbsp;·&nbsp; HC: <span id="c1-hc" style="color:#2ecc71">—</span>
       </div>
       <div class="stat-line">
         Speed: <span id="c1-speed-cur">0</span> / <span id="c1-speed-max">—</span>
@@ -74,10 +91,6 @@
       <div class="stat-line">
         MG: <span id="c1-w0-dp" style="color:#2ecc71">—</span>
         &nbsp;<span id="c1-w0-ammo">—</span> rds
-        &nbsp;·&nbsp; Tires:
-        <span id="c1-tire-fl" class="tire-dot" title="FL">&#9632;</span><span id="c1-tire-fr" class="tire-dot" title="FR">&#9632;</span>
-        <span id="c1-tire-rl" class="tire-dot" title="RL">&#9632;</span><span id="c1-tire-rr" class="tire-dot" title="RR">&#9632;</span>
-        <span id="c1-tire-rl2" class="tire-dot" title="RL2" style="display:none">&#9632;</span><span id="c1-tire-rr2" class="tire-dot" title="RR2" style="display:none">&#9632;</span>
       </div>
     </div>
 
@@ -85,20 +98,39 @@
     <div class="car-panel" id="panel-2">
       <div class="car-header p2">— <span class="player-tag">P2</span></div>
       <div class="armor-grid">
-        <div class="armor-cell a-top">
+        <!-- row 1: front + FL/FR tires -->
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c2-tire-fl" title="FL">—</span>
+        </div>
+        <div class="armor-cell-center">
           <span class="af-label">Front</span>
           <span class="armor-val" id="c2-front">—</span>
         </div>
-        <div class="armor-cell a-mid">
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c2-tire-fr" title="FR">—</span>
+        </div>
+        <!-- row 2: left / car icon / right -->
+        <div class="armor-cell-side">
           <span class="af-label">L</span>
           <span class="armor-val" id="c2-left">—</span>
-          <span class="car-icon">&#9632;</span>
-          <span class="armor-val" id="c2-right">—</span>
-          <span class="af-label">R</span>
         </div>
-        <div class="armor-cell a-bot">
+        <span class="car-icon">&#9632;</span>
+        <div class="armor-cell-side" style="flex-direction:row-reverse">
+          <span class="af-label">R</span>
+          <span class="armor-val" id="c2-right">—</span>
+        </div>
+        <!-- row 3: back + RL/RR tires -->
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c2-tire-rl" title="RL">—</span>
+          <span class="tire-corner" id="c2-tire-rl2" title="RL2" style="display:none">—</span>
+        </div>
+        <div class="armor-cell-center">
           <span class="af-label">Back</span>
           <span class="armor-val" id="c2-back">—</span>
+        </div>
+        <div class="tire-corner-stack">
+          <span class="tire-corner" id="c2-tire-rr" title="RR">—</span>
+          <span class="tire-corner" id="c2-tire-rr2" title="RR2" style="display:none">—</span>
         </div>
       </div>
       <div class="armor-tu">
@@ -108,8 +140,7 @@
       </div>
       <div class="stat-line">
         Driver: <span id="c2-driver" style="color:#2ecc71">—</span>
-        &nbsp;·&nbsp; HC: <span id="c2-hc">—</span>
-        &nbsp;·&nbsp; HS: <span id="c2-hs" style="color:#2ecc71">—</span>
+        &nbsp;·&nbsp; HC: <span id="c2-hc" style="color:#2ecc71">—</span>
       </div>
       <div class="stat-line">
         Speed: <span id="c2-speed-cur">0</span> / <span id="c2-speed-max">—</span>
@@ -118,10 +149,6 @@
       <div class="stat-line">
         MG: <span id="c2-w0-dp" style="color:#2ecc71">—</span>
         &nbsp;<span id="c2-w0-ammo">—</span> rds
-        &nbsp;·&nbsp; Tires:
-        <span id="c2-tire-fl" class="tire-dot" title="FL">&#9632;</span><span id="c2-tire-fr" class="tire-dot" title="FR">&#9632;</span>
-        <span id="c2-tire-rl" class="tire-dot" title="RL">&#9632;</span><span id="c2-tire-rr" class="tire-dot" title="RR">&#9632;</span>
-        <span id="c2-tire-rl2" class="tire-dot" title="RL2" style="display:none">&#9632;</span><span id="c2-tire-rr2" class="tire-dot" title="RR2" style="display:none">&#9632;</span>
       </div>
     </div>
 
@@ -146,38 +173,44 @@
         <div id="move-phase-info" class="ctrl-label">Phase 1 of 5</div>
         <div class="moves-disp">Moves left: <strong id="moves-left">0</strong></div>
         <div id="maneuver-menu" style="display:none">
-          <div class="maneuver-row">
-            <button class="man-btn" data-man="straight">Straight</button>
+          <!-- Bend angle stepper -->
+          <div class="bend-stepper">
+            <button id="bend-dec" class="speed-btn">&#9664;</button>
+            <span id="bend-angle-label">45&#xB0;</span>
+            <button id="bend-inc" class="speed-btn">&#9654;</button>
+            <span id="bend-dc-label" class="hint">D3</span>
           </div>
-          <div class="maneuver-row">
-            <button class="man-btn" data-man="drift-l">Drift L</button>
-            <button class="man-btn" data-man="drift-r">Drift R</button>
+          <!-- Skid distance selector -->
+          <div class="bend-stepper" id="skid-stepper">
+            <span class="af-label" style="min-width:32px">Skid</span>
+            <button id="skid-dec" class="speed-btn">&#9664;</button>
+            <span id="skid-dist-label" style="min-width:40px;text-align:center;color:#f39c12">None</span>
+            <button id="skid-inc" class="speed-btn">&#9654;</button>
+            <span id="skid-dc-label" class="hint" style="min-width:28px"></span>
           </div>
+          <!-- Bend L / Straight / Bend R -->
           <div class="maneuver-row">
-            <button class="man-btn" data-man="steep-l">Steep L</button>
-            <button class="man-btn" data-man="steep-r">Steep R</button>
+            <button class="man-btn" id="btn-bend-l">Bend L</button>
+            <button class="man-btn" id="btn-straight">Straight</button>
+            <button class="man-btn" id="btn-bend-r">Bend R</button>
           </div>
+          <!-- Swerve L / Swerve R -->
           <div class="maneuver-row">
-            <button class="man-btn" data-man="bend45-l">Bend 45&#xB0; L</button>
-            <button class="man-btn" data-man="bend45-r">Bend 45&#xB0; R</button>
+            <button class="man-btn" id="btn-swerve-l">Swerve L</button>
+            <button class="man-btn" id="btn-swerve-r">Swerve R</button>
           </div>
+          <!-- Drift / Steep -->
           <div class="maneuver-row">
-            <button class="man-btn" data-man="bend90-l">Bend 90&#xB0; L</button>
-            <button class="man-btn" data-man="bend90-r">Bend 90&#xB0; R</button>
+            <button class="man-btn" id="btn-drift-l">Drift L</button>
+            <button class="man-btn" id="btn-steep-l">Steep L</button>
+            <button class="man-btn" id="btn-steep-r">Steep R</button>
+            <button class="man-btn" id="btn-drift-r">Drift R</button>
           </div>
+          <!-- Bootlegger -->
           <div class="maneuver-row">
-            <button class="man-btn" data-man="swerve45-l">Swerve 45&#xB0; L</button>
-            <button class="man-btn" data-man="swerve45-r">Swerve 45&#xB0; R</button>
-          </div>
-          <div class="maneuver-row">
-            <button class="man-btn" data-man="swerve90-l">Swerve 90&#xB0; L</button>
-            <button class="man-btn" data-man="swerve90-r">Swerve 90&#xB0; R</button>
-          </div>
-          <div class="maneuver-row">
-            <button class="man-btn boot-btn" data-man="bootlegger">Bootlegger D7</button>
+            <button class="man-btn boot-btn" id="btn-boot">Bootlegger (D7)</button>
           </div>
         </div>
-        <button id="do-bootlegger" class="mode-btn boot-btn" style="display:none;margin-top:4px">Execute Bootlegger</button>
         <button id="end-move" class="btn-primary" style="display:none;margin-top:6px">Blocked &#x2014; Skip Move</button>
       </div>
 
