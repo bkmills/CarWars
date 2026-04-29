@@ -7,7 +7,7 @@
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════
 
-const PHASE = { SPEED: 'SPEED', MOVE: 'MOVE', FIRE: 'FIRE' };
+const PHASE = { SPEED: 'SPEED', MOVE: 'MOVE' };
 
 // ── Facing geometry ──────────────────────────────────────────
 // car.facing = degrees clockwise from North (0=N, 90=E, 180=S, 270=W)
@@ -32,7 +32,7 @@ function facingLabel(deg) {
 function carCenter(car) {
   const [fdx, fdy] = facingToVec(car.facing);
   const [rx, ry]   = rightVec(car.facing);
-  return { x: car.x - 1.5*fdx + 0.5*rx + 0.5, y: car.y - 1.5*fdy + 0.5*ry + 0.5 };
+  return { x: car.x + rx - 2*fdx, y: car.y + ry - 2*fdy };
 }
 
 // 4 OBB corners of the 4×2 car rectangle (front-left origin)
@@ -101,13 +101,16 @@ function inBounds(x, y, deg) {
 function bendDC(angleDeg) { return Math.ceil(Math.abs(angleDeg) / 15); }
 
 function destForBend(car, angleDeg) {
-  // Move 4 sq forward then rotate around rear axle center by angleDeg
+  // Move 4 sq forward, then anchor the turning-side rear corner.
+  // Right bend → right rear corner stays fixed; left bend → left rear corner stays fixed.
+  // After advancing 4 sq the rear corners land on the original front corners.
   const [fdx, fdy] = facingToVec(car.facing);
   const [rx, ry]   = rightVec(car.facing);
   const bf = car.reverse ? -1 : 1;
   const midX = car.x + fdx*4*bf, midY = car.y + fdy*4*bf;
-  const pivX = midX + rx*0.5 - fdx*3.5*bf;
-  const pivY = midY + ry*0.5 - fdy*3.5*bf;
+  const turnsRight = (car.reverse ? -angleDeg : angleDeg) > 0;
+  const pivX = turnsRight ? car.x + 2*rx : car.x;
+  const pivY = turnsRight ? car.y + 2*ry : car.y;
   const relX = midX - pivX, relY = midY - pivY;
   const tr = angleDeg * Math.PI / 180;
   const cs = Math.cos(tr), sn = Math.sin(tr);
@@ -141,17 +144,16 @@ function destForSteepDrift(car, dir) {
 }
 
 function destForPivot(car, angleDeg) {
-  // 5mph pivot: advance 1 sq forward, then rotate around rear axle of advanced position
+  // 5mph pivot: advance 1 sq, then anchor the turning-side rear corner.
   const [fdx, fdy] = facingToVec(car.facing);
   const [rx, ry]   = rightVec(car.facing);
   const bf = car.reverse ? -1 : 1;
-  // Step 1: advance 1 sq
   const midX = car.x + fdx*bf;
   const midY = car.y + fdy*bf;
-  // Step 2: rear axle at advanced position
-  const rearX = midX + rx*0.5 - fdx*3.5*bf;
-  const rearY = midY + ry*0.5 - fdy*3.5*bf;
-  // Step 3: rotate advanced front-left around that rear axle
+  // Rear corners after 1-sq advance (car still 4 sq long)
+  const turnsRight = (car.reverse ? -angleDeg : angleDeg) > 0;
+  const rearX = turnsRight ? midX + 2*rx - 4*fdx*bf : midX - 4*fdx*bf;
+  const rearY = turnsRight ? midY + 2*ry - 4*fdy*bf : midY - 4*fdy*bf;
   const tr = (car.reverse ? -angleDeg : angleDeg) * Math.PI / 180;
   const cs = Math.cos(tr), sn = Math.sin(tr);
   const relX = midX - rearX, relY = midY - rearY;
@@ -322,6 +324,12 @@ class Car {
     this.controlledSkidPending = null;  // { dir, skidSq, afterSq, decel, tireDmg }
     this.fireModifier  = 0;     // 0=normal, -3=*, -6=**, 999=no aimed fire
     this.maneuverUsedThisPhase = false;
+    this.firedThisTurn = false;
+    this.driverSkill = cfg.driverSkill || 0;
+    this.gunnerSkill = cfg.gunnerSkill || 0;
+    this.reflexRoll  = 0;
+    this._rollRecovery = false;
+    this.immobilized  = false;
     const edp = cfg.engineDp || 6;
     const tdp = cfg.tireDp   || 4;
     const tc  = cfg.tireCount || 4;
@@ -343,31 +351,29 @@ class Car {
   }
 
   isDestroyed() {
-    if (!this.alive || this.driverHits >= 2) return true;
-    const a = this.armor;
-    return a.front <= 0 && a.back <= 0 && a.left <= 0 && a.right <= 0;
+    return !this.alive || this.driverHits >= 2;
   }
 }
 
 const CAR_DEFS = [
   {
-    id: 1, name: 'Killer Kart', color: '#e74c3c',
-    x: 4, y: 21, facing: 90,
-    maxSpeed: 75, accel: 15, hc: 3,
-    armor: { front: 4, back: 3, left: 3, right: 3, top: 0, under: 0 },
+    id: 1, name: 'Alpha', color: '#e74c3c',
+    x: 5, y: 21, facing: 90,
+    maxSpeed: 75, accel: 15, hc: 4,
+    armor: { front: 5, back: 5, left: 5, right: 5, top: 0, under: 0 },
     weapons: [
       { name: 'Machine Gun', type: 'mg', range: 32,
-        damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
+        damageDice: 1, damageSides: 6, rof: 1, ammo: 20, dp: 3 },
     ],
   },
   {
-    id: 2, name: 'Killer Kart', color: '#3498db',
-    x: 59, y: 22, facing: 270,
-    maxSpeed: 75, accel: 15, hc: 3,
-    armor: { front: 4, back: 3, left: 3, right: 3, top: 0, under: 0 },
+    id: 2, name: 'Beta', color: '#3498db',
+    x: 59, y: 23, facing: 270,
+    maxSpeed: 75, accel: 15, hc: 4,
+    armor: { front: 5, back: 5, left: 5, right: 5, top: 0, under: 0 },
     weapons: [
       { name: 'Machine Gun', type: 'mg', range: 32,
-        damageDice: 1, damageSides: 6, rof: 2, ammo: 20, dp: 3 },
+        damageDice: 1, damageSides: 6, rof: 1, ammo: 20, dp: 3 },
     ],
   },
 ];
@@ -384,13 +390,16 @@ function rollDice(num, sides) {
 
 // ── Handling / Control ───────────────────────────────────────────
 
-function decelDC(extraDecel) {
-  // extraDecel in mph beyond safe decel (car.accel = 15 mph)
-  if (extraDecel <=  5) return 1;
-  if (extraDecel <= 10) return 2;
-  if (extraDecel <= 15) return 3;
-  if (extraDecel <= 25) return 5;
-  return 7;
+// totalDecel in mph; safe decel is 10 mph per rulebook
+// Returns { dc, tireDmg } where tireDmg is 0, 2, "d6", or "d6+3"
+function decelInfo(totalDecel) {
+  if (totalDecel <= 15) return { dc:  1, tireDmg: 0      };
+  if (totalDecel <= 20) return { dc:  2, tireDmg: 0      };
+  if (totalDecel <= 25) return { dc:  3, tireDmg: 0      };
+  if (totalDecel <= 30) return { dc:  5, tireDmg: 0      };
+  if (totalDecel <= 35) return { dc:  7, tireDmg: 2      };
+  if (totalDecel <= 40) return { dc:  9, tireDmg: 'd6'   };
+  return                       { dc: 11, tireDmg: 'd6+3' };
 }
 
 function applyManeuver(car, dc, msgs, preFacing) {
@@ -445,10 +454,12 @@ function _applyTireDamage(car, dmg, msgs) {
 function crashTable1(car, crashDC, preFacing, msgs) {
   const bandIdx = Math.max(0, Math.min(9, Math.ceil(car.speed / 10) - 1));
   const mod     = CONTROL_MODIFIER[bandIdx] + (crashDC - 3);
-  const roll    = rollDice(2, 6).total;
-  const total   = Math.max(2, roll + mod);
-  const modStr  = mod !== 0 ? (mod > 0 ? '+' : '') + mod : '';
-  msgs.push(car.name + ' — Crash Table 1: 2d6=' + roll + modStr + '=' + total);
+  const roll      = rollDice(2, 6).total;
+  const skill     = car.driverSkill || 0;
+  const total     = Math.max(2, roll + mod - skill);
+  const modStr    = mod !== 0 ? (mod > 0 ? '+' : '') + mod : '';
+  const skillStr  = skill > 0 ? '-' + skill + '(skill)' : '';
+  msgs.push(car.name + ' — Crash Table 1: 2d6=' + roll + modStr + skillStr + '=' + total);
 
   if (total <= 2) {
     // Trivial skid: ¼" in pre-maneuver dir. *
@@ -482,29 +493,46 @@ function crashTable1(car, crashDC, preFacing, msgs) {
     car.spinout = { dir: preFacing, rotDir };
     car.fireModifier = 999;
     _applyTireDamage(car, tireRoll, msgs);
-    msgs.push('\u25b6 SPINOUT (***) — 90\xb0 spin + 1"/phase, tires \u2212' + tireRoll + ' DP, decel 20 mph/turn, no aimed fire');
+    msgs.push('\u25b6 Spinout (***) — 90\xb0 spin + 1"/phase, tires \u2212' + tireRoll + ' DP, decel 20 mph/turn, no aimed fire');
   } else if (total <= 14) {
-    // Roll: car rolls over, 1d damage each facing, decel 20/turn. ***
+    // Roll: sideways roll, 1d damage per phase to each side rolled onto. ***
     const rotDir = Math.random() < 0.5 ? 2 : -2;
-    car.spinout  = { dir: preFacing, rotDir };
+    car.spinout  = { dir: preFacing, rotDir, rollOrientation: 0 };
     car.fireModifier = 999;
-    for (const face of ['front', 'back', 'left', 'right']) {
-      const d = rollDice(1, 6).total;
-      msgs.push(...applyDamage(car, d, face));
-    }
     if (total >= 13) msgs.push('\u25b6 ROLLS OVER — FIRE CHECK: ' + (Math.floor(Math.random() * 6) + 1 >= 4 ? 'BURNING!' : 'no fire'));
-    msgs.push('\u25b6 CAR ROLLS (***) — 1d dmg all facings, decel 20 mph/turn, no aimed fire');
+    msgs.push('\u25b6 CAR ROLLS (***) — rolling ' + (rotDir < 0 ? 'left' : 'right') + ', 1d dmg/phase, decel 20 mph/turn, no aimed fire');
   } else {
-    // Vault: vaults into air, 3d tires, 1d each facing. ***
-    const rotDir = Math.random() < 0.5 ? 2 : -2;
-    car.spinout  = { dir: preFacing, rotDir };
-    car.fireModifier = 999;
+    // Vault: flies through air, lands, then continues as Roll. ***
+    const rotDir      = Math.random() < 0.5 ? 2 : -2;
+    const vaultDist   = rollDice(1, 6).total;           // 1d6 inches traveled
+    const landOri     = (2 * vaultDist) % 4;            // landing orientation
+    // 3d damage to vaulting tires
     _applyTireDamage(car, rollDice(3, 6).total, msgs);
-    for (const face of ['front', 'back', 'left', 'right']) {
-      msgs.push(...applyDamage(car, rollDice(1, 6).total, face));
-    }
-    msgs.push('\u25b6 VAULT (***) — 3d tire dmg, 1d all facings, no aimed fire');
+    // Move car vaultDist inches in travel direction
+    const [vfdx, vfdy] = facingToVec(preFacing);
+    car.x = Math.max(0, Math.min(GRID_COLS - 1, car.x + vaultDist * 4 * vfdx));
+    car.y = Math.max(0, Math.min(GRID_ROWS - 1, car.y + vaultDist * 4 * vfdy));
+    // Collision damage to landing face at initial speed (speed/20 d6, min 1d)
+    const collisionDice = Math.max(1, Math.floor(car.speed / 20));
+    const landFacing    = getRollFacing(rotDir, landOri);
+    msgs.push(...applyDamage(car, rollDice(collisionDice, 6).total, landFacing));
+    msgs.push('\u25b6 VAULT (***) — flies ' + vaultDist + '\u201d, ' + collisionDice + 'd collision on ' + landFacing + ', rolling ' + (rotDir < 0 ? 'left' : 'right'));
+    // Occupant takes 1 automatic damage (body armor does not protect)
+    car.driverHits++;
+    if (car.driverHits >= 2) { car.alive = false; msgs.push('DRIVER KILLED — ' + car.name + ' is OUT!'); }
+    else msgs.push(car.name + ' — occupant auto-damage (' + car.driverHits + '/2)');
+    // Continue rolling from landing orientation
+    car.spinout      = { dir: preFacing, rotDir, rollOrientation: landOri };
+    car.fireModifier = 999;
   }
+}
+
+function getRollFacing(rotDir, orientation) {
+  if (orientation === 0) return 'under';
+  if (orientation === 2) return 'top';
+  return rotDir < 0
+    ? (orientation === 1 ? 'left'  : 'right')  // rolling left:  L→T→R→U
+    : (orientation === 1 ? 'right' : 'left');   // rolling right: R→T→L→U
 }
 
 function checkFireArc(attacker, target, weapon) {
@@ -514,20 +542,27 @@ function checkFireArc(attacker, target, weapon) {
   if (dist === 0) return { canFire: false, reason: 'Same square' };
 
   const [fdx, fdy] = facingToVec(attacker.facing);
-  const dot = (dx * fdx + dy * fdy) / dist;
+  const [rx,  ry]  = rightVec(attacker.facing);
+  const fwd = dx * fdx + dy * fdy;
+  const lat = dx * rx  + dy * ry;
 
-  if (dot < 0.707) return { canFire: false, reason: 'Target not in front arc (\xB145\xB0)' };
-  if (dist > weapon.range) return { canFire: false, reason: 'Out of range (' + dist.toFixed(1) + ' sq, max ' + weapon.range + ')' };
+  // Front arc boundary = corner-to-corner diagonals of 4×2 car: fwd > 2×|lat|
+  if (fwd <= 2 * Math.abs(lat)) return { canFire: false, reason: 'Target not in front arc' };
 
   return { canFire: true, dist };
 }
 
-function calcToHit(target, dist, fireModifier) {
+function calcToHit(target, dist, fireModifier, gunnerSkill) {
   if (fireModifier >= 999) return 999;
   let toHit = 7;
-  toHit += Math.max(0, Math.floor((dist - 4) / 4));
+  if (dist <= 4) {
+    toHit -= 4;                          // point blank (≤1"): +4 to roll
+  } else {
+    toHit += Math.floor(dist / 16);      // long range: +1 per full 4"
+  }
   if (target.speed === 0) toHit -= 1;
-  if (fireModifier) toHit -= fireModifier;  // -3 → +3, -6 → +6 (harder)
+  if (fireModifier) toHit -= fireModifier;
+  toHit -= (gunnerSkill || 0);
   return Math.max(2, Math.min(12, toHit));
 }
 
@@ -624,17 +659,17 @@ function hitComponent(car, facing, damage, msgs) {
 function _onComponentDestroyed(car, label, msgs) {
   msgs.push('\u26a0 ' + label + ' DESTROYED!');
   if (label === 'Engine') {
-    car.maxSpeed = 0;
-    car.speed    = 0;
-    car.alive    = false;
-    msgs.push(car.name + ' engine out \u2014 car disabled!');
+    car.maxSpeed     = 0;
+    car.speed        = 0;
+    car.immobilized  = true;
+    msgs.push(car.name + ' engine out \u2014 immobilized!');
   } else if (label.endsWith('Tire')) {
     car.hc = Math.max(0, car.hc - 1);
     if (car.handlingStatus > car.hc) car.handlingStatus = car.hc;
     msgs.push(car.name + ' tire blown! HC \u2192 ' + car.hc);
     if (car.hc === 0) {
-      car.alive = false;
-      msgs.push(car.name + ' lost all tires \u2014 destroyed!');
+      car.immobilized = true;
+      msgs.push(car.name + ' lost all tires \u2014 immobilized!');
     }
   } else {
     msgs.push(car.name + "'s " + label + ' is out of action!');
@@ -694,6 +729,8 @@ function buildCarConfig(sel, color, carId) {
       name:'Machine Gun', type:'mg', range:32,
       damageDice:1, damageSides:6, rof:2, ammo:mgAmmo, dp:mgData.dp,
     }] : [],
+    driverSkill: sel.driverSkill || 0,
+    gunnerSkill: sel.gunnerSkill || 0,
   };
 }
 
@@ -710,6 +747,8 @@ const CarBuilder = {
     confirmBtn.className = 'btn-primary' + (step === 2 ? ' p2' : '');
 
     document.getElementById('cb-name').value = step === 1 ? 'Killer Kart' : 'Deathmobile';
+    document.getElementById('cb-driver-skill').value = 0;
+    document.getElementById('cb-gunner-skill').value = 0;
     ['cb-body','cb-chassis','cb-susp','cb-engine','cb-tires'].forEach(id => {
       document.getElementById(id).selectedIndex = 0;
     });
@@ -740,6 +779,8 @@ const CarBuilder = {
       hasMG:    document.getElementById('cb-mg').checked,
       mgAmmo:   Math.max(0, Math.min(20, +document.getElementById('cb-mg-ammo').value || 0)),
       name:     document.getElementById('cb-name').value.trim(),
+      driverSkill: Math.min(9, Math.max(0, +document.getElementById('cb-driver-skill').value || 0)),
+      gunnerSkill: Math.min(9, Math.max(0, +document.getElementById('cb-gunner-skill').value || 0)),
     };
   },
 
@@ -862,6 +903,23 @@ const CarBuilder = {
 class GameState {
   constructor(carCfgs) {
     this.cars            = carCfgs.map(def => new Car(def));
+    // Reflex rolls — rolled once at start of combat
+    this.reflexMsgs = [];
+    this.cars.forEach(car => {
+      const die   = Math.floor(Math.random() * 6) + 1;
+      const total = die + car.driverSkill;
+      car.reflexRoll = total;
+      const skillStr = car.driverSkill > 0 ? '+' + car.driverSkill + '(skill)' : '';
+      let hcBonus = 0;
+      if      (total >= 6) hcBonus = 2;
+      else if (total >= 5) hcBonus = 1;
+      if (hcBonus > 0) {
+        car.hc             += hcBonus;
+        car.handlingStatus  = Math.min(car.handlingStatus + hcBonus, car.hc);
+      }
+      const hcStr = hcBonus > 0 ? ' → HC +' + hcBonus + ' (now ' + car.hc + ')' : '';
+      this.reflexMsgs.push(car.name + ': Reflex roll 1d6=' + die + skillStr + '=' + total + hcStr);
+    });
     this.activeIdx       = 0;
     this.phase           = PHASE.SPEED;
     this.turn            = 1;
@@ -875,7 +933,12 @@ class GameState {
     this.halfMovePhase   = false;  // current move is a ½" straight-only move
     this.halfMovePending = false;  // after the current full move, a forced ½" follows (1½" phase)
     this.skidDist        = 0;     // controlled skid distance: 0=none, 1=¼", 2=½", 3=¾", 4=1"
-    this.bendAngle       = 45;    // current bend angle selection (15/30/45/60/75/90)
+    this.bendAngle           = 45;    // current bend angle selection (15/30/45/60/75/90)
+    this.phaseFireIdx        = -1;    // -1=inactive, 0=P1 offered, 1=P2 offered
+    this.phaseFireKills      = [];    // car indices killed during current phase's fire
+    this.phaseFireAliveStart = [];    // alive snapshot at start of phase fire offer
+    this._terminalFireOffer = false; // true = finalize goes to endTurnFinal
+    this.moveTrail          = [];    // pre-move snapshots for ghost trail visualization
   }
 
   // Set movesRemaining + half-move flags from a PHASE_CHART cell value.
@@ -916,7 +979,22 @@ class GameState {
     const prevMag     = car.speed;
     const prevReverse = car.reverse;
     const msgs        = [];
+    if (car._rollRecovery) {
+      car._rollRecovery = false;
+      const liveTires = Object.values(car.components.tires).filter(t => !t.destroyed).length;
+      msgs.push(car.name + ' stopped rolling right-side up with ' + liveTires + ' tires — may continue!');
+    }
 
+    // If car is in a crash spin/roll, speed is auto-locked — no player input
+    if (car.spinout) {
+      msgs.push(car.name + ' spinning \u2014 speed locked at ' + car.speed + ' mph');
+      if (this.activeIdx === 0) {
+        this.activeIdx = 1;
+      } else {
+        msgs.push(...this._enterMovePhase());
+      }
+      return msgs;
+    }
     const wantReverse = signedSpeed < 0;
     let   wantMag     = Math.abs(signedSpeed);
 
@@ -939,15 +1017,37 @@ class GameState {
     car.reverse = wantReverse && wantMag > 0;
 
     const decelAmt = prevMag - wantMag;
-    if (decelAmt > car.accel) {
-      const dc = decelDC(decelAmt - car.accel);
-      msgs.push(car.name + ' emergency brake \u2212' + decelAmt + ' mph (D' + dc + ')');
-      applyManeuver(car, dc, msgs, car.facing);
+    if (decelAmt > 10) {
+      const info = decelInfo(decelAmt);
+      let brakeMsg = car.name + ' hard brake \u2212' + decelAmt + ' mph (D' + info.dc + ')';
+      // Tire damage at 35+ mph decel
+      if (info.tireDmg === 'd6+3') {
+        const td = rollDice(1, 6).total + 3;
+        brakeMsg += ', tires \u2212' + td + ' DP';
+        msgs.push(brakeMsg);
+        _applyTireDamage(car, td, msgs);
+      } else if (info.tireDmg === 'd6') {
+        const td = rollDice(1, 6).total;
+        brakeMsg += ', tires \u2212' + td + ' DP';
+        msgs.push(brakeMsg);
+        _applyTireDamage(car, td, msgs);
+      } else if (info.tireDmg === 2) {
+        brakeMsg += ', tires \u22122 DP';
+        msgs.push(brakeMsg);
+        _applyTireDamage(car, 2, msgs);
+      } else {
+        msgs.push(brakeMsg);
+      }
+      // Control roll at original speed (rules: "at the original speed")
+      car.speed = prevMag;
+      applyManeuver(car, info.dc, msgs, car.facing);
+      car.speed = wantMag;
       this._checkDestroyed(msgs);
     }
-    msgs.unshift(car.name + ' sets speed to ' +
-      (car.reverse ? '\u2212' : '') + car.speed + ' mph' +
-      (car.reverse ? ' (REVERSE)' : ''));
+    const _delta = Math.abs(car.speed - prevMag);
+    const _verb  = car.speed > prevMag ? 'accelerates' : car.speed < prevMag ? 'decelerates' : 'holds speed at';
+    const _spd   = (car.reverse ? '−' : '') + car.speed + ' mph' + (car.reverse ? ' (REVERSE)' : '');
+    msgs.unshift(car.name + ' ' + _verb + (_delta > 0 ? ' ' + _delta + ' to ' : ' ') + _spd);
 
     if (this.activeIdx === 0) {
       this.activeIdx      = 1;
@@ -968,35 +1068,38 @@ class GameState {
 
   _startMovePhase() {
     const msgs = [];
-    // Advance past phases where no car moves
-    while (this.movePhase <= 5) {
-      const phIdx = this.movePhase - 1;
-      this.moveOrder = [];
-      for (let i = 0; i < this.cars.length; i++) {
-        const car = this.cars[i];
-        if (!car.isDestroyed() && car.speed > 0 && PHASE_CHART[car.speed / 5][phIdx] > 0) {
-          this.moveOrder.push(i);
-        }
-      }
-      if (this.moveOrder.length > 0) break;
-      this.movePhase++;
+
+    if (this.movePhase > 5) {
+      this._endTurnFinal();
+      return msgs;
     }
 
-    if (this.movePhase > 5 || this.moveOrder.length === 0) {
-      if (!this.gameOver) {
-        msgs.push('\u25b6Turn ' + this.turn + ' \u00b7 Fire');
-        this._enterFirePhase();
+    const phIdx = this.movePhase - 1;
+    this.moveOrder = [];
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      if (!car.isDestroyed() && car.speed > 0 && PHASE_CHART[car.speed / 5][phIdx] > 0) {
+        this.moveOrder.push(i);
       }
-      return msgs;
+    }
+
+    if (this.moveOrder.length === 0) {
+      // No movement this phase — offer fire (player may choose to fire)
+      return [...msgs, ...this._enterPhaseFireOffer()];
     }
 
     msgs.push('\u25b6Turn ' + this.turn + ' \u00b7 Phase ' + this.movePhase);
 
-    // Resolve move order — tie gets a coin flip
+    // Resolve move order — tie uses reflex roll, coin flip only if equal
     if (this.moveOrder.length === 2 &&
         this.cars[this.moveOrder[0]].speed === this.cars[this.moveOrder[1]].speed) {
-      if (Math.random() < 0.5) this.moveOrder.reverse();
-      msgs.push('Ph' + this.movePhase + ' tie \u2014 coin flip: ' +
+      const r0 = this.cars[this.moveOrder[0]].reflexRoll;
+      const r1 = this.cars[this.moveOrder[1]].reflexRoll;
+      let tieMethod;
+      if      (r0 < r1) { this.moveOrder.reverse(); tieMethod = 'reflex'; }
+      else if (r0 > r1) {                           tieMethod = 'reflex'; }
+      else              { if (Math.random() < 0.5) this.moveOrder.reverse(); tieMethod = 'coin flip'; }
+      msgs.push('---Ph' + this.movePhase + ' Speeds equal — ' + tieMethod + ': ' +
                 this.cars[this.moveOrder[0]].name + ' moves first');
     } else {
       this.moveOrder.sort((a, b) => this.cars[b].speed - this.cars[a].speed);
@@ -1027,8 +1130,8 @@ class GameState {
       }
       return crashMsgs;
     } else {
-      this.movePhase++;
-      return this._startMovePhase();
+      // Movement done for this phase — offer fire before advancing
+      return this._enterPhaseFireOffer();
     }
   }
 
@@ -1104,6 +1207,8 @@ class GameState {
     if (!inBounds(dest.x, dest.y, dest.facing)) return [];
     if (!car.isDestroyed() && obbOverlap({ x:dest.x, y:dest.y, facing:dest.facing }, this.enemyCar)) return [];
 
+    this.moveTrail.push({ x: car.x, y: car.y, facing: car.facing, carIdx: this.activeIdx, label: label });
+
     car.x      = dest.x;
     car.y      = dest.y;
     car.facing = dest.facing;
@@ -1131,6 +1236,8 @@ class GameState {
       msgs.push(car.name + ' Ph' + this.movePhase + ' [' + label + '] facing ' + facingLabel(car.facing));
     }
 
+    if (skid && isSkiddable) this.skidDist = 0;  // reset after use
+
     // Queue controlled skid if declared, control was maintained, and no crash occurred
     if (skid && isSkiddable && !car.crashPending && !car.spinout && !car.isDestroyed()) {
       if (skid.fireMod === 999) car.fireModifier = 999;
@@ -1155,6 +1262,11 @@ class GameState {
   _applyCrashEffects() {
     const car  = this.activeCar;
     const msgs = [];
+
+    if (car.controlledSkidPending || car.spinout || car.crashPending) {
+      const crashLabel = car.controlledSkidPending ? 'Skd' : car.spinout ? 'Spn' : 'Crs';
+      this.moveTrail.push({ x: car.x, y: car.y, facing: car.facing, carIdx: this.activeIdx, label: crashLabel });
+    }
 
     if (car.controlledSkidPending) {
       const { dir, skidSq, afterSq, decel, tireDmg } = car.controlledSkidPending;
@@ -1184,13 +1296,27 @@ class GameState {
     }
 
     if (car.spinout) {
-      const { dir, rotDir } = car.spinout;
+      const { dir, rotDir, rollOrientation } = car.spinout;
       car.facing = normalizeDeg(car.facing + rotDir * 45);
       const [fdx, fdy] = facingToVec(dir);
       car.x = Math.max(0, Math.min(GRID_COLS - 1, car.x + 4 * fdx));
       car.y = Math.max(0, Math.min(GRID_ROWS - 1, car.y + 4 * fdy));
       msgs.push(car.name + ' spinning \u2014 facing now ' + facingLabel(car.facing) +
                 ', drifts to (' + car.x.toFixed(1) + ',' + car.y.toFixed(1) + ')');
+      // Per-phase roll damage
+      if (rollOrientation !== undefined) {
+        const newOri = (rollOrientation + 1) % 4;
+        car.spinout.rollOrientation = newOri;
+        const face = getRollFacing(rotDir, newOri);
+        if (face === 'under') {
+          const tireHit = rollDice(1, 6).total;
+          _applyTireDamage(car, tireHit, msgs);
+          msgs.push(car.name + ' rolls onto UNDERSIDE \u2014 tires \u2212' + tireHit + ' DP');
+        } else {
+          msgs.push(...applyDamage(car, rollDice(1, 6).total, face));
+          msgs.push(car.name + ' rolls onto ' + face + ' side');
+        }
+      }
       this.movesRemaining = 0;
       this._checkDestroyed(msgs);
       return msgs;
@@ -1233,11 +1359,23 @@ class GameState {
     return msgs;
   }
 
+  _carCanFire(car) {
+    return car.weapons.some(w => !w.destroyed && w.ammo > 0);
+  }
+
   _checkDestroyed(msgs) {
     for (let i = 0; i < this.cars.length; i++) {
-      if (this.cars[i].isDestroyed() && !this.gameOver) {
+      const car = this.cars[i];
+      if (car.isDestroyed() && !this.gameOver) {
         this.gameOver = true;
         this.winner   = this.cars[1 - i];
+        msgs.push('\u2605 ' + this.winner.name + ' WINS!');
+        return;
+      }
+      if (car.immobilized && !this._carCanFire(car) && !this.gameOver) {
+        this.gameOver = true;
+        this.winner   = this.cars[1 - i];
+        msgs.push(car.name + ' is immobilized with no weapons \u2014 out of the fight!');
         msgs.push('\u2605 ' + this.winner.name + ' WINS!');
         return;
       }
@@ -1249,6 +1387,7 @@ class GameState {
   canBootlegger() {
     const car = this.activeCar;
     return this.phase === PHASE.MOVE &&
+           this.phaseFireIdx < 0 &&
            this.movesRemaining > 0 &&
            !car.maneuverUsedThisPhase &&
            !this.halfMovePhase &&
@@ -1274,37 +1413,63 @@ class GameState {
     return msgs;
   }
 
-  // ── Fire ────────────────────────────────────────────────────────
+  // ── Phase fire offer (simultaneous fire within each move phase) ─────
 
-  _enterFirePhase() {
-    this.phase     = PHASE.FIRE;
-    this.activeIdx = 0;
-    this.cars[0].weapons.forEach(w => { w.shotsThisTurn = 0; });
+  _canOfferFire(carIdx) {
+    const car   = this.cars[carIdx];
+    const enemy = this.cars[1 - carIdx];
+    return this.phaseFireAliveStart[carIdx] &&
+           !car.firedThisTurn &&
+           car.fireModifier < 999 &&
+           car.weapons.some(w => !w.destroyed && w.ammo > 0 && checkFireArc(car, enemy, w).canFire);
   }
 
-  fireWeapon(idx) {
-    const attacker = this.activeCar;
-    const target   = this.enemyCar;
-    const weapon   = attacker.weapons[idx];
+  _enterPhaseFireOffer() {
+    this.phaseFireKills      = [];
+    this.phaseFireAliveStart = this.cars.map(c => !c.isDestroyed());
+    this.phaseFireIdx        = 0;
+    return this._advancePhaseFireOffer();
+  }
 
-    if (!weapon)                        return { hit: false, messages: ['No such weapon'] };
-    if (weapon.destroyed)               return { hit: false, messages: [weapon.name + ' is destroyed!'] };
-    if (weapon.ammo <= 0)               return { hit: false, messages: [weapon.name + ' is out of ammo!'] };
-    if (weapon.shotsThisTurn >= weapon.rof)
-                                        return { hit: false, messages: [weapon.name + ' ROF limit reached'] };
+  _advancePhaseFireOffer() {
+    while (this.phaseFireIdx <= 1) {
+      if (this._canOfferFire(this.phaseFireIdx)) {
+        this.activeIdx = this.phaseFireIdx;
+        return [];
+      }
+      this.phaseFireIdx++;
+    }
+    return this._finalizePhaseFireOffer();
+  }
 
-    if (attacker.fireModifier >= 999)    return { hit: false, messages: ['No aimed fire this turn (***)'] };
+  passPhaseFireOffer() {
+    this.phaseFireIdx++;
+    return this._advancePhaseFireOffer();
+  }
+
+  fireWeaponInPhase(weaponIdx) {
+    const attackerIdx = this.phaseFireIdx;
+    const targetIdx   = 1 - attackerIdx;
+    const attacker    = this.cars[attackerIdx];
+    const target      = this.cars[targetIdx];
+    const weapon      = attacker.weapons[weaponIdx];
+
+    if (!weapon)          return { hit: false, messages: ['No such weapon'] };
+    if (weapon.destroyed) return { hit: false, messages: [weapon.name + ' is destroyed!'] };
+    if (weapon.ammo <= 0) return { hit: false, messages: [weapon.name + ' is out of ammo!'] };
+    if (attacker.fireModifier >= 999) return { hit: false, messages: ['No aimed fire this turn (***)'] };
 
     const arcCheck = checkFireArc(attacker, target, weapon);
-    if (!arcCheck.canFire)              return { hit: false, messages: [arcCheck.reason] };
+    if (!arcCheck.canFire) return { hit: false, messages: [arcCheck.reason] };
 
     const dist    = arcCheck.dist;
-    const toHit   = calcToHit(target, dist, attacker.fireModifier);
+    const toHit   = calcToHit(target, dist, attacker.fireModifier, attacker.gunnerSkill);
     const diceRes = rollDice(2, 6);
     const hit     = diceRes.total >= toHit;
 
     weapon.shotsThisTurn++;
     weapon.ammo--;
+    attacker.firedThisTurn = true;
 
     const msgs = [
       attacker.name + ' fires ' + weapon.name + ' at ' + target.name,
@@ -1320,42 +1485,102 @@ class GameState {
                 dmgRes.rolls.join('+') + '=' + dmgRes.total);
       msgs.push(...applyDamage(target, dmgRes.total, hitFacing));
       if (target.isDestroyed()) {
-        this.gameOver = true;
-        this.winner   = attacker;
-        msgs.push('\u2605 ' + attacker.name + ' WINS! \u2605');
+        this.phaseFireKills.push(targetIdx);
+        msgs.push(target.name + ' destroyed! (resolving simultaneously\u2026)');
       }
     }
-    return { hit, messages: msgs };
+
+    this.phaseFireIdx++;
+    return { hit, messages: [...msgs, ...this._advancePhaseFireOffer()] };
   }
 
-  // Called when active player ends their fire turn
-  endFire() {
+  _finalizePhaseFireOffer() {
     const msgs = [];
-    if (this.activeIdx === 0) {
-      // P1 done — P2 fires
-      this.activeIdx = 1;
-      this.cars[1].weapons.forEach(w => { w.shotsThisTurn = 0; });
-      msgs.push('--- ' + this.activeCar.name + ' (P2) fires ---');
-    } else {
-      // P2 done — end turn
-      this._endTurnFinal();
+    this.phaseFireIdx = -1;
+
+    const p1Dead = this.phaseFireKills.includes(0);
+    const p2Dead = this.phaseFireKills.includes(1);
+    if (p1Dead) this.cars[0].alive = false;
+    if (p2Dead) this.cars[1].alive = false;
+
+    if (p1Dead && p2Dead) {
+      this.gameOver = true;
+      this.winner   = null;
+      msgs.push('\u2605 DRAW \u2014 Both destroyed! \u2605');
+    } else if (p1Dead) {
+      this.gameOver = true;
+      this.winner   = this.cars[1];
+      msgs.push('\u2605 ' + this.winner.name + ' WINS! \u2605');
+    } else if (p2Dead) {
+      this.gameOver = true;
+      this.winner   = this.cars[0];
+      msgs.push('\u2605 ' + this.winner.name + ' WINS! \u2605');
+    }
+
+    if (!this.gameOver) {
+      if (this._terminalFireOffer) {
+        this._terminalFireOffer = false;
+        this._endTurnFinal();
+      } else {
+        this.movePhase++;
+        if (this.movePhase > 5) {
+          this._endTurnFinal();
+        } else if (this._noMoreMovement()) {
+          const someCanFire = this.cars.some((c, i) =>
+            !c.isDestroyed() && !c.firedThisTurn && c.fireModifier < 999 &&
+            c.weapons.some(w => !w.destroyed && w.ammo > 0 && checkFireArc(c, this.cars[1 - i], w).canFire)
+          );
+          if (someCanFire) {
+            this._terminalFireOffer = true;
+            msgs.push(...this._enterPhaseFireOffer());
+          } else {
+            this._endTurnFinal();
+          }
+        } else {
+          msgs.push(...this._startMovePhase());
+        }
+      }
     }
     return msgs;
+  }
+
+  _noMoreMovement() {
+    for (let ph = this.movePhase; ph <= 5; ph++) {
+      for (const car of this.cars) {
+        if (!car.isDestroyed() && car.speed > 0 && PHASE_CHART[car.speed / 5][ph - 1] > 0) return false;
+      }
+    }
+    return true;
   }
 
   _endTurnFinal() {
     for (const car of this.cars) {
       if (car.spinout) {
         car.speed = Math.max(0, car.speed - 20);
-        if (car.speed === 0) car.spinout = null;
+        if (car.speed === 0) {
+          const { rollOrientation } = car.spinout;
+          car.spinout = null;
+          if (rollOrientation !== undefined) {
+            if (rollOrientation === 0) {
+              const liveTires = Object.values(car.components.tires).filter(t => !t.destroyed).length;
+              if (liveTires >= 3) { car._rollRecovery = true; }
+              else { car.alive = false; }
+            } else {
+              car.alive = false;
+            }
+          }
+        }
       }
       car.fireModifier   = 0;
+      car.firedThisTurn  = false;
       car.handlingStatus = Math.min(car.hc, car.handlingStatus + car.hc);
+      car.weapons.forEach(w => { w.shotsThisTurn = 0; });
     }
     this.turn++;
     this.activeIdx      = 0;
     this.phase          = PHASE.SPEED;
     this.movesRemaining = 0;
+    this.movePhase      = 0;
   }
 }
 
@@ -1403,8 +1628,9 @@ class Grid {
 
   _highlights() {
     const { gs } = this;
-    if (gs.phase === PHASE.MOVE && gs.movesRemaining > 0) this._drawGhosts();
-    if (gs.phase === PHASE.FIRE) this._fireTarget();
+    this._drawMoveTrail();
+    if (gs.phase === PHASE.MOVE && gs.movesRemaining > 0 && gs.phaseFireIdx < 0) this._drawGhosts();
+    if (gs.phaseFireIdx >= 0) this._fireTarget();
     this._activeOutline();
   }
 
@@ -1433,8 +1659,8 @@ class Grid {
       const base = dcColor[dc] || dcColor[0];
       const [fdx2, fdy2] = facingToVec(dest.facing);
       const [rx2, ry2]   = rightVec(dest.facing);
-      const cx = (dest.x - 1.5*fdx2 + 0.5*rx2 + 0.5) * SQ;
-      const cy = (dest.y - 1.5*fdy2 + 0.5*ry2 + 0.5) * SQ;
+      const cx = (dest.x + rx2 - 2*fdx2) * SQ;
+      const cy = (dest.y + ry2 - 2*fdy2) * SQ;
       const angle = (dest.facing - 90) * Math.PI / 180;
       const hl = 2*SQ, hw = SQ;
       ctx.save();
@@ -1483,13 +1709,89 @@ class Grid {
     }
   }
 
+  // Ghost trail — draw transparent outlines at each car's position before its last move
+  _drawMoveTrail() {
+    const ctx   = this.ctx;
+    const gs    = this.gs;
+    if (!gs.moveTrail || gs.moveTrail.length === 0) return;
+
+    const hl = 2 * SQ, hw = SQ;
+
+    for (let i = 0; i < gs.moveTrail.length; i++) {
+      const t   = gs.moveTrail[i];
+      const car = gs.cars[t.carIdx];
+      if (!car) continue;
+
+      const [fdx, fdy] = facingToVec(t.facing);
+      const [rx,  ry]  = rightVec(t.facing);
+      const cx  = (t.x + rx - 2 * fdx) * SQ;
+      const cy  = (t.y + ry - 2 * fdy) * SQ;
+      const angle = (t.facing - 90) * Math.PI / 180;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      // Faint tinted fill
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle   = car.color;
+      ctx.fillRect(-hl, -hw, hl * 2, hw * 2);
+
+      // Dashed outline — longer dashes than the predictor to visually distinguish
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = car.color;
+      ctx.lineWidth   = Math.max(1, SQ * 0.07);
+      ctx.setLineDash([SQ * 0.3, SQ * 0.1]);
+      ctx.strokeRect(-hl, -hw, hl * 2, hw * 2);
+
+      // Maneuver label
+      const lbl = !t.label ? '?' :
+        t.label === 'Straight' ? 'S' :
+        t.label.charCodeAt(0) === 0xbd ? '\xbdS' :
+        t.label.replace(/^Bend (\d+)\xb0 ([LR])/, 'B$1$2')
+               .replace(/^Drift ([LR])/, 'D$1')
+               .replace(/^Steep ([LR])/, 'St$1')
+               .replace(/^Swerve ([LR]).*/, 'Sw$1')
+               .replace(/^Pivot \d+\xb0 ([LR])/, 'Pv$1')
+               .slice(0, 5);
+      ctx.globalAlpha  = 0.75;
+      ctx.setLineDash([]);
+      ctx.fillStyle    = car.color;
+      ctx.font         = 'bold ' + Math.max(7, Math.round(SQ * 0.36)) + 'px monospace';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lbl, 0, 0);
+
+      ctx.restore();
+
+      // Line from ghost center to current car center
+      const cur   = gs.cars[t.carIdx];
+      const [cfdx, cfdy] = facingToVec(cur.facing);
+      const [crx,  cry]  = rightVec(cur.facing);
+      const curCx = (cur.x + crx - 2 * cfdx) * SQ;
+      const curCy = (cur.y + cry - 2 * cfdy) * SQ;
+
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = car.color;
+      ctx.lineWidth   = Math.max(1, SQ * 0.05);
+      ctx.setLineDash([SQ * 0.12, SQ * 0.08]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(curCx, curCy);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   _fireTarget() {
     const ctx   = this.ctx;
-    const atk   = this.gs.activeCar;
-    const enemy = this.gs.enemyCar;
+    const gs    = this.gs;
+    const atk   = gs.cars[gs.phaseFireIdx];
+    const enemy = gs.cars[1 - gs.phaseFireIdx];
     let canFire = false;
     for (const w of atk.weapons) {
-      if (w.ammo > 0 && w.shotsThisTurn < w.rof && checkFireArc(atk, enemy, w).canFire) {
+      if (!w.destroyed && w.ammo > 0 && !atk.firedThisTurn && checkFireArc(atk, enemy, w).canFire) {
         canFire = true; break;
       }
     }
@@ -1530,8 +1832,8 @@ class Grid {
     const ctx   = this.ctx;
     const [fdx, fdy] = facingToVec(car.facing);
     const [rx, ry]   = rightVec(car.facing);
-    const cx  = (car.x - 1.5*fdx + 0.5*rx + 0.5)*SQ;
-    const cy  = (car.y - 1.5*fdy + 0.5*ry + 0.5)*SQ;
+    const cx  = (car.x + rx - 2*fdx)*SQ;
+    const cy  = (car.y + ry - 2*fdy)*SQ;
     const ang = (car.facing - 90) * Math.PI / 180;
     ctx.save();
     ctx.translate(cx, cy);
@@ -1551,8 +1853,8 @@ class Grid {
     const [fdx, fdy] = facingToVec(car.facing);
     const [rx, ry]   = rightVec(car.facing);
 
-    const midX  = (car.x - 1.5*fdx + 0.5*rx + 0.5) * SQ;
-    const midY  = (car.y - 1.5*fdy + 0.5*ry + 0.5) * SQ;
+    const midX  = (car.x + rx - 2*fdx) * SQ;
+    const midY  = (car.y + ry - 2*fdy) * SQ;
     const angle = (car.facing - 90) * Math.PI / 180;
     const halfLen = 2 * SQ;
     const halfW   = SQ;
@@ -1724,8 +2026,8 @@ class UI {
     setText('turn-num',    gs.turn);
     setText('active-name', gs.activeCar.name);
     const phaseText = gs.phase === PHASE.SPEED ? 'Set speed'
-      : gs.phase === PHASE.MOVE ? 'MOVE ' + gs.movePhase + '/5'
-      : gs.phase;
+      : gs.phaseFireIdx >= 0 ? 'FIRE Ph ' + gs.movePhase + '/5'
+      : 'MOVE ' + gs.movePhase + '/5';
     setText('phase-label', phaseText);
     setText('moves-left',  gs.movesRemaining);
   }
@@ -1733,8 +2035,9 @@ class UI {
   _controls() {
     const { gs } = this;
     showEl('speed-controls', gs.phase === PHASE.SPEED);
+    showEl('btn-surrender', gs.phase === PHASE.SPEED && gs.activeCar.immobilized && gs.activeCar.weapons.some(w => !w.destroyed && w.ammo > 0));
     showEl('move-controls',  gs.phase === PHASE.MOVE);
-    showEl('fire-controls',  gs.phase === PHASE.FIRE);
+    showEl('fire-controls',  false);
     const car = gs.activeCar;
     setText('speed-max-hint',   car.maxSpeed);
     setText('speed-rev-hint',   Math.floor(car.maxSpeed / 5));
@@ -1742,26 +2045,26 @@ class UI {
     // Move-controls
     if (gs.phase === PHASE.MOVE) {
       const el = document.getElementById('move-phase-info');
-      if (el) el.textContent = 'Phase ' + gs.movePhase + ' of 5  \u2014  ' + gs.activeCar.name;
-      const hasMoves = gs.movesRemaining > 0;
+      const inFireOffer = gs.phaseFireIdx >= 0;
+      if (el) el.textContent = inFireOffer
+        ? 'Phase ' + gs.movePhase + ' \u2014 ' + gs.cars[gs.phaseFireIdx].name + ' fire?'
+        : 'Phase ' + gs.movePhase + ' of 5  \u2014  ' + gs.activeCar.name;
+      const hasMoves = gs.movesRemaining > 0 && !inFireOffer;
       showEl('maneuver-menu', hasMoves);
       if (hasMoves) this._updateManeuverMenu();
+      showEl('fire-offer-controls', inFireOffer);
+      if (inFireOffer) this._updateFireOfferUI();
       // End Move only when genuinely blocked
       const endMoveBtn = document.getElementById('end-move');
       if (endMoveBtn) {
-        const stuck = gs.movesRemaining > 0 && !gs.hasValidMoves();
+        const stuck = !inFireOffer && gs.movesRemaining > 0 && !gs.hasValidMoves();
         showEl('end-move', stuck);
         if (stuck) endMoveBtn.textContent = 'Blocked \u2014 Skip Move';
       }
     }
-    // Fire-controls end button label
-    const endBtn = document.getElementById('end-turn');
-    if (endBtn && gs.phase === PHASE.FIRE) {
-      endBtn.textContent = gs.activeIdx === 0 ? 'End P1 Fire \u2192' : 'End Turn \u2192';
-    }
     // Tint primary action buttons to match active player
     const isP2 = gs.activeIdx === 1;
-    ['set-speed', 'end-move', 'end-turn'].forEach(id => {
+    ['set-speed', 'end-move', 'btn-fire-weapon-0', 'btn-pass-fire'].forEach(id => {
       const b = document.getElementById(id);
       if (b) b.classList.toggle('p2', isP2);
     });
@@ -1813,12 +2116,31 @@ class UI {
     if (bb) bb.disabled = !gs.canBootlegger();
   }
 
+  _updateFireOfferUI() {
+    const gs  = this.gs;
+    const car = gs.cars[gs.phaseFireIdx];
+    const enemy = gs.cars[1 - gs.phaseFireIdx];
+    car.weapons.forEach((w, i) => {
+      const btn = document.getElementById('btn-fire-weapon-' + i);
+      if (!btn) return;
+      if (w.destroyed || w.ammo <= 0) {
+        btn.disabled = true;
+        btn.textContent = w.name + ' (unavailable)';
+        return;
+      }
+      const arcCheck = checkFireArc(car, enemy, w);
+      btn.disabled = !arcCheck.canFire;
+      btn.title    = arcCheck.canFire ? '' : arcCheck.reason;
+      btn.textContent = 'Fire ' + w.name + ' (' + w.ammo + ' ammo)';
+    });
+  }
+
   _weaponInfo() {
-    if (this.gs.phase !== PHASE.FIRE) return;
-    const car   = this.gs.activeCar;
+    if (this.gs.phaseFireIdx < 0) return;
+    const gs  = this.gs;
+    const car = gs.cars[gs.phaseFireIdx];
     const lines = car.weapons.map(w => {
-      const shots = w.rof - w.shotsThisTurn;
-      return w.name + ': ' + (w.ammo>0 && shots>0 ? shots+' shot(s) left' : 'no shots');
+      return w.name + ': ' + (w.ammo > 0 ? w.ammo + ' ammo' : 'EMPTY');
     });
     setText('weapon-info', lines.join(' | '));
   }
@@ -1826,14 +2148,14 @@ class UI {
   log(messages, playerIdx) {
     if (!messages || (Array.isArray(messages) && messages.length === 0)) return;
     if (typeof messages === 'string') messages = [messages];
-    const pi = playerIdx !== undefined ? playerIdx : this.gs.activeIdx;
-    const defaultCls = messages[0] && String(messages[0]).startsWith('---')
-      ? 'sys'
-      : 'p' + (pi + 1);
+    const pi = playerIdx !== undefined && playerIdx !== null ? playerIdx : this.gs.activeIdx;
+    const defaultCls = playerIdx === null ? 'sys' : 'p' + (pi + 1);
     messages.forEach(m => {
       const s   = String(m);
-      const hdr = s.startsWith('\u25b6');
-      this.logLines.push({ h: esc(hdr ? s.slice(1) : s), c: hdr ? 'hdr' : defaultCls });
+      const hdr = s.startsWith('▶');
+      const sys = !hdr && s.startsWith('---');
+      const cls = hdr ? 'hdr' : sys ? 'sys' : defaultCls;
+      this.logLines.push({ h: esc(hdr ? s.slice(1) : sys ? s.slice(3).trimLeft() : s), c: cls });
     });
     this.logLines = this.logLines.slice(-80);
     const el = document.getElementById('action-log');
@@ -1849,7 +2171,7 @@ class UI {
     const ov = document.getElementById('game-over');
     const mg = document.getElementById('game-over-msg');
     if (ov) ov.style.display = 'flex';
-    if (mg) mg.textContent   = winner.name + ' WINS!';
+    if (mg) mg.textContent   = winner ? winner.name + ' WINS!' : 'DRAW \u2014 Both Destroyed!';
   }
 }
 
@@ -1878,9 +2200,10 @@ const game = (function() {
     if (h1) h1.firstChild.textContent = p1cfg.name + ' ';
     const h2 = document.querySelector('#panel-2 .car-header');
     if (h2) h2.firstChild.textContent = p2cfg.name + ' ';
-    ui.log('Car Wars \u2014 ' + p1cfg.name + ' (P1) vs ' + p2cfg.name + ' (P2)');
+    ui.log('Car Wars \u2014 ' + p1cfg.name + ' (P1) vs ' + p2cfg.name + ' (P2)', null);
+    gs.reflexMsgs.forEach(m => ui.log(m, null));
     ui.log('\u25b6Turn 1');
-    ui.log('Set speed and press GO!');
+    ui.log('Set speed and press GO!', null);
     render();
   }
 
@@ -1927,24 +2250,26 @@ const game = (function() {
   // ── Canvas click ────────────────────────────────────────────
   canvas.addEventListener('click', function(e) {
     if (!gs || gs.gameOver) return;
-    if (gs.phase === PHASE.MOVE) return;   // sidebar buttons handle movement
+    if (gs.phase === PHASE.MOVE && gs.phaseFireIdx < 0) return;  // sidebar buttons handle movement
 
-    if (gs.phase === PHASE.FIRE) {
+    if (gs.phaseFireIdx >= 0) {
       const { col, row } = grid.screenToGrid(e.clientX, e.clientY);
-      const enemy = gs.enemyCar;
-      if (!pointInCar(col, row, enemy)) return;
+      const target = gs.cars[1 - gs.phaseFireIdx];
+      if (!pointInCar(col, row, target)) return;
+      const attacker = gs.cars[gs.phaseFireIdx];
       let fired = false;
-      for (let i = 0; i < gs.activeCar.weapons.length; i++) {
-        const w = gs.activeCar.weapons[i];
-        if (w.ammo > 0 && w.shotsThisTurn < w.rof) {
-          const res = gs.fireWeapon(i);
-          ui.log(res.messages);
+      for (let i = 0; i < attacker.weapons.length; i++) {
+        const w = attacker.weapons[i];
+        if (!w.destroyed && w.ammo > 0) {
+          const snapIdx = gs.phaseFireIdx;
+          const res = gs.fireWeaponInPhase(i);
+          ui.log(res.messages, snapIdx);
           fired = true;
           break;
         }
       }
       if (!fired) ui.log('No weapons available.');
-      if (gs.gameOver) ui.showGameOver(gs.winner);
+      afterPhaseFire([]);
       render();
     }
   });
@@ -1969,6 +2294,7 @@ const game = (function() {
   document.getElementById('set-speed').addEventListener('click', function() {
     const snapIdx = gs.activeIdx;
     ui.log(gs.setSpeed(selectedSpeed), snapIdx);
+    advanceSpinoutSpeeds();
     if (gs.phase === PHASE.SPEED) {
       // P2 now declaring — init selector to P2's current signed speed
       const c = gs.activeCar;
@@ -2056,20 +2382,49 @@ const game = (function() {
   });
 
   // ── Fire / End Turn ─────────────────────────────────────────
-  document.getElementById('end-turn').addEventListener('click', doEndFire);
-
-  function doEndFire() {
-    const snapIdx = gs.activeIdx;
-    const msgs = gs.endFire();
-    ui.log(msgs, snapIdx);
-    if (gs.phase === PHASE.SPEED) {
-      const c = gs.activeCar;
-      selectedSpeed = c.reverse ? -c.speed : c.speed;
-      syncSpeed();
-      ui.log('\u25b6Turn ' + gs.turn);
+  function advanceSpinoutSpeeds() {
+    while (gs.phase === PHASE.SPEED && gs.activeCar.spinout) {
+      const idx = gs.activeIdx;
+      const car = gs.activeCar;
+      const m   = gs.setSpeed(car.reverse ? -car.speed : car.speed);
+      if (m && m.length) ui.log(m, idx);
     }
+  }
+
+  function afterPhaseFire(msgs, snapIdx) {
+    if (msgs && msgs.length) ui.log(msgs, snapIdx);
+    if (gs.phase === PHASE.SPEED) {
+      ui.log('\u25b6Turn ' + gs.turn);
+      advanceSpinoutSpeeds();
+      if (gs.phase === PHASE.SPEED) {
+        const c = gs.activeCar;
+        selectedSpeed = c.reverse ? -c.speed : c.speed;
+        syncSpeed();
+      }
+    }
+    if (gs.gameOver) ui.showGameOver(gs.winner);
     render();
   }
+
+  document.getElementById('btn-fire-weapon-0').addEventListener('click', function() {
+    if (gs.phaseFireIdx < 0) return;
+    const snapIdx = gs.phaseFireIdx;
+    const res = gs.fireWeaponInPhase(0);
+    ui.log(res.messages, snapIdx);
+    afterPhaseFire([]);
+  });
+
+  document.getElementById('btn-pass-fire').addEventListener('click', function() {
+    if (gs.phaseFireIdx < 0) return;
+    const snapIdx = gs.phaseFireIdx;
+    const msgs = gs.passPhaseFireOffer();
+    afterPhaseFire(msgs, snapIdx);
+  });
+
+  // ── Clear move trail ────────────────────────────────────────
+  document.getElementById('clear-trail-btn').addEventListener('click', function() {
+    if (gs) { gs.moveTrail = []; render(); }
+  });
 
   // ── Fullscreen ──────────────────────────────────────────────
   document.getElementById('fullscreen-btn').addEventListener('click', function() {
@@ -2078,6 +2433,18 @@ const game = (function() {
     } else {
       document.documentElement.requestFullscreen().catch(function() {});
     }
+  });
+
+  document.getElementById('btn-surrender').addEventListener('click', function() {
+    if (!gs || !gs.activeCar.immobilized) return;
+    const car    = gs.activeCar;
+    const winner = gs.cars[1 - gs.activeIdx];
+    gs.gameOver  = true;
+    gs.winner    = winner;
+    const msgs   = [car.name + ' surrenders!', '★ ' + winner.name + ' WINS!'];
+    ui.log(msgs);
+    ui.showGameOver(gs.winner);
+    render();
   });
 
   document.getElementById('zoom-in-btn').addEventListener('click', function()  { setZoom(zoomLevel + ZOOM_STEP); });
@@ -2143,7 +2510,9 @@ const game = (function() {
         syncSpeed();
       }
       if (e.key === 'Enter') {
-        ui.log(gs.setSpeed(selectedSpeed), gs.activeIdx);
+        const snapIdx = gs.activeIdx;
+        ui.log(gs.setSpeed(selectedSpeed), snapIdx);
+        advanceSpinoutSpeeds();
         if (gs.phase === PHASE.SPEED) {
           const c = gs.activeCar;
           selectedSpeed = c.reverse ? -c.speed : c.speed;
@@ -2153,9 +2522,9 @@ const game = (function() {
       }
     }
 
-    if (gs.phase === PHASE.FIRE && (e.key === 'Enter' || e.key === ' ')) {
+    if (gs.phaseFireIdx >= 0 && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
-      doEndFire();
+      document.getElementById('btn-pass-fire').click();
     }
   });
 

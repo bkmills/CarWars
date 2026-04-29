@@ -32,6 +32,7 @@
         <button id="zoom-out-btn" title="Zoom out (X)">&#x2212;</button>
         <span id="zoom-level">100%</span>
         <button id="zoom-in-btn"  title="Zoom in (Z)">&#x2B;</button>
+        <button id="clear-trail-btn" title="Remove move shadows">&#x2205;</button>
         <button id="fullscreen-btn" title="Toggle fullscreen (F)">&#x26F6;</button>
       </div>
     </div>
@@ -166,6 +167,7 @@
         </div>
         <button id="set-speed" class="btn-primary">GO &#x2192;</button>
         <div class="hint">or press + / − then Enter</div>
+        <button id="btn-surrender" class="btn-secondary" style="display:none;margin-top:8px;border-top:1px solid #555;padding-top:8px;width:100%">Surrender</button>
       </div>
 
       <!-- MOVE phase -->
@@ -212,15 +214,19 @@
           </div>
         </div>
         <button id="end-move" class="btn-primary" style="display:none;margin-top:6px">Blocked &#x2014; Skip Move</button>
+
+        <!-- Fire offer (appears within move phase after movement) -->
+        <div id="fire-offer-controls" style="display:none;margin-top:8px;border-top:1px solid #444;padding-top:8px">
+          <div class="ctrl-label">&#x1F4A5; Fire opportunity</div>
+          <div id="weapon-info" class="weapon-info"></div>
+          <button id="btn-fire-weapon-0" class="btn-primary" style="margin-top:4px">Fire Weapon</button>
+          <button id="btn-pass-fire" class="btn-secondary" style="margin-top:4px">Pass</button>
+          <div class="hint">Click enemy car to fire &bull; Enter/Space to pass</div>
+        </div>
       </div>
 
-      <!-- FIRE phase -->
-      <div id="fire-controls" style="display:none">
-        <div class="ctrl-label">Click highlighted enemy to fire</div>
-        <div id="weapon-info" class="weapon-info"></div>
-        <button id="end-turn" class="btn-primary">End Turn &#x2192;</button>
-        <div class="hint">Enter or Space to end turn</div>
-      </div>
+      <!-- FIRE phase (legacy, always hidden) -->
+      <div id="fire-controls" style="display:none"></div>
 
     </div>
 
@@ -253,6 +259,11 @@
 
     <div id="cb-name-row">
       Car Name: <input id="cb-name" type="text" maxlength="20" value="Killer Kart" />
+    </div>
+    <div id="cb-skill-row">
+      Driver Skill: <input id="cb-driver-skill" type="number" value="0" min="0" max="9" style="width:3em" />
+      &nbsp;&nbsp;
+      Gunner Skill: <input id="cb-gunner-skill" type="number" value="0" min="0" max="9" style="width:3em" />
     </div>
 
     <table id="cb-table">

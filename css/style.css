@@ -410,12 +410,16 @@ html, body {
   margin-bottom: 6px;
 }
 .log-line.hdr {
-  border-left-color: #e74c3c;
-  color: #e74c3c;
+  border-left-color: #27ae60;
+  border-top: 1px solid rgba(39,174,96,0.35);
+  border-bottom: 1px solid rgba(39,174,96,0.35);
+  color: #27ae60;
   font-weight: bold;
   font-size: 12px;
-  margin-top: 8px;
-  padding-top: 4px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  padding-top: 5px;
+  padding-bottom: 5px;
   letter-spacing: 1px;
 }
 

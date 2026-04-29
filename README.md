@@ -54,7 +54,7 @@ Each turn has three phases:
 - 8-directional facing (N, NE, E, SE, S, SW, W, NW)
 - Each car occupies a **2×4 footprint** (2 wide × 4 deep squares)
 - Speed determines which of the 5 phases a car moves in (Compendium Movement Chart)
-- Faster car moves first each phase; coin flip on ties
+- Faster car moves first each phase; speeds equal → reflex roll decides, coin flip only if those tie too
 
 ### Maneuvers
 Select a maneuver from the sidebar panel — it executes immediately (no second click needed).
@@ -166,7 +166,7 @@ CarWars/
 ├── css/
 │   └── style.css    # Dark retro styling
 └── js/
-    └── game.js      # All game logic (~1950 lines)
+    └── game.js      # All game logic (~2550 lines)
 ```
 
 Key symbols in `game.js`:
@@ -195,7 +195,8 @@ Key symbols in `game.js`:
 **v0.5** ✅ — Sidebar maneuver panel, reverse driving, Crash Table 1 (skids/spinouts/rolls)  
 **v0.6** ✅ — Car builder (body/chassis/suspension/engine/tires/armor/weapon), 6-facing armor, variable component DP  
 **v0.7** ✅ — Free movement (float-degree facing, OBB collision), Swerve, Pivot (5 mph), Controlled Skid, ghost car previews  
-**v0.8** 🔲 — Arena options (walls, debris, starting layouts)  
+**v0.8** ✅ — Move-shadow ghost trail (maneuver labels), bend/pivot corner-rule geometry fix, action log polish (green turn headers, gray system messages, player-color messages, accelerates/decelerates wording)  
+**v0.9** 🔲 — Arena options (walls, debris, starting layouts)  
 **Future** 🔲 — Additional weapons, AI opponent, 3+ cars, mobile support  
 
 ---
